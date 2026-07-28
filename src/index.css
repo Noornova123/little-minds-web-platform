@@ -1,0 +1,212 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Pure white theme — clean, solid white surfaces with light gray structure */
+    --cream: #ffffff;
+    --cream-deep: #f4f4f5;
+    --ink: #18181b;
+    --ink-soft: #71717a;
+    --terracotta: #c66b3d;
+    --terracotta-soft: #e0986e;
+    --amber: #d99a2b;
+    --sage: #7c9a76;
+    --sage-deep: #5d7a58;
+    --sage-soft: #b9cdb4;
+    --line: #e4e4e7;
+    /* Playful kids-tool color pops */
+    --sunny: #f4c542;
+    --sunny-soft: #fef3c7;
+    --coral: #ee8a6b;
+    --coral-soft: #fde4d8;
+    --sky: #6ba8c9;
+    --sky-soft: #d6ebf3;
+    --grape: #9b7bc0;
+    --grape-soft: #e8dff1;
+  }
+
+  html, body, #root {
+    height: 100%;
+  }
+
+  body {
+    background-color: var(--cream);
+    color: var(--ink);
+    font-family: 'Nunito', 'Segoe UI', system-ui, -apple-system, sans-serif;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  * {
+    border-color: var(--line);
+  }
+}
+
+@layer components {
+  .lm-card {
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 1.5rem;
+    box-shadow: 0 1px 2px rgba(59, 53, 48, 0.04), 0 4px 16px rgba(59, 53, 48, 0.04);
+    transition: transform 0.15s ease, box-shadow 0.15s ease;
+  }
+  .lm-card-bouncy:hover:not(.disabled) {
+    transform: translateY(-3px);
+    box-shadow: 0 4px 8px rgba(59, 53, 48, 0.06), 0 12px 28px rgba(59, 53, 48, 0.08);
+  }
+
+  /* Playful wiggle for mascot/icons on hover */
+  @keyframes lm-wiggle {
+    0%, 100% { transform: rotate(0deg); }
+    25% { transform: rotate(-6deg); }
+    75% { transform: rotate(6deg); }
+  }
+  .lm-wiggle:hover { animation: lm-wiggle 0.4s ease; }
+
+  /* Soft bounce-in for the welcome popup */
+  @keyframes lm-pop-in {
+    0% { opacity: 0; transform: scale(0.92); }
+    60% { transform: scale(1.02); }
+    100% { opacity: 1; transform: scale(1); }
+  }
+  .lm-pop-in { animation: lm-pop-in 0.4s cubic-bezier(0.34, 1.56, 0.64, 1) both; }
+
+  .lm-btn {
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 0.5rem;
+    border-radius: 0.875rem;
+    font-weight: 700;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, background-color 0.12s ease, color 0.12s ease, border-color 0.12s ease;
+    cursor: pointer;
+    user-select: none;
+  }
+  .lm-btn:active { transform: translateY(1px); }
+  .lm-btn:disabled { opacity: 0.55; cursor: not-allowed; }
+
+  .lm-btn-primary {
+    background: var(--terracotta);
+    color: #fff;
+  }
+  .lm-btn-primary:hover:not(:disabled) { background: #b85e33; }
+
+  .lm-btn-sage {
+    background: var(--sage);
+    color: #fff;
+  }
+  .lm-btn-sage:hover:not(:disabled) { background: var(--sage-deep); }
+
+  .lm-btn-ghost {
+    background: transparent;
+    color: var(--ink);
+    border: 1px solid var(--line);
+  }
+  .lm-btn-ghost:hover:not(:disabled) { background: var(--cream-deep); }
+
+  .lm-input {
+    width: 100%;
+    background: #fff;
+    border: 1px solid var(--line);
+    border-radius: 0.75rem;
+    padding: 0.625rem 0.875rem;
+    color: var(--ink);
+    transition: border-color 0.12s ease, box-shadow 0.12s ease;
+    outline: none;
+  }
+  .lm-input:focus {
+    border-color: var(--terracotta-soft);
+    box-shadow: 0 0 0 3px rgba(224, 152, 110, 0.18);
+  }
+
+  .lm-label {
+    font-size: 0.8rem;
+    font-weight: 700;
+    color: var(--ink-soft);
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+  }
+
+  .lm-chip {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.35rem;
+    padding: 0.2rem 0.6rem;
+    border-radius: 999px;
+    font-size: 0.78rem;
+    font-weight: 700;
+  }
+
+  /* Mobile bottom-sheet modal */
+  .lm-modal-panel {
+    border-radius: 1.5rem;
+  }
+}
+
+/* ──────────────── Mobile responsive fixes ──────────────── */
+@media (max-width: 640px) {
+  /* Modals become bottom sheets */
+  .lm-modal-overlay {
+    align-items: flex-end !important;
+    padding: 0 !important;
+  }
+  .lm-modal-panel {
+    border-radius: 1.5rem 1.5rem 0 0 !important;
+    max-height: 92vh !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  /* Tables: hide on mobile, show card view instead */
+  .lm-responsive-table {
+    display: none !important;
+  }
+  .lm-responsive-cards {
+    display: block !important;
+  }
+
+  /* Tap targets: ensure minimum 44px height */
+  .lm-btn {
+    min-height: 44px;
+  }
+
+  /* Prevent horizontal overflow globally */
+  .lm-overflow-guard {
+    overflow-x: hidden;
+    max-width: 100vw;
+  }
+
+  /* Chart scroll container */
+  .lm-chart-scroll {
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  .lm-chart-scroll > svg {
+    min-width: 480px;
+  }
+}
+
+@media (min-width: 641px) {
+  .lm-responsive-table {
+    display: block !important;
+  }
+  .lm-responsive-cards {
+    display: none !important;
+  }
+}
+
+/* Subtle entrance animation used across views */
+@keyframes lm-fade-up {
+  from { opacity: 0; transform: translateY(8px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+.lm-fade-up { animation: lm-fade-up 0.35s ease both; }
+
+/* Print styles for the parent-facing student report */
+@media print {
+  .no-print { display: none !important; }
+  .print-page { box-shadow: none !important; border: none !important; }
+  body { background: #fff !important; }
+}
