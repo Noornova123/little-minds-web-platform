@@ -415,7 +415,7 @@ function ActivityForm({ activity, categories, gradeLevels, forceType, onClose, o
       open
       onClose={onClose}
       title={activity ? `Edit ${isCurriculum ? `Day ${activity.day_number}` : 'library activity'}` : (isCurriculum ? 'Add daily activity' : 'Add library activity')}
-      size="xl"
+      size="full"
       footer={
         <>
           <Button variant="ghost" onClick={onClose}>Cancel</Button>
