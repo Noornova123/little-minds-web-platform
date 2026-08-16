@@ -426,11 +426,11 @@ function ActivityForm({ activity, categories, gradeLevels, forceType, onClose, o
       <div className="space-y-5">
         {err && <p className="text-sm font-semibold text-[#dc2626] bg-[#fef2f2] rounded-lg px-3 py-2">{err}</p>}
 
-        <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-4">
           {isCurriculum ? (
             <Input label="Day number" type="number" min={1} value={day} onChange={(e) => setDay(Number(e.target.value))} />
           ) : null}
-          <div className={isCurriculum ? 'col-span-2' : 'col-span-3'}>
+          <div className={isCurriculum ? 'sm:col-span-2 md:col-span-2' : 'sm:col-span-2 md:col-span-3'}>
             <Input label="Title" value={title} onChange={(e) => setTitle(e.target.value)} placeholder="e.g. Mindful Breathing" />
           </div>
           <label className="block">
