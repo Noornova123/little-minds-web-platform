@@ -7,7 +7,7 @@ interface ModalProps {
   title: string;
   children: ReactNode;
   footer?: ReactNode;
-  size?: 'sm' | 'md' | 'lg' | 'xl';
+  size?: 'sm' | 'md' | 'lg' | 'xl' | 'full';
 }
 
 const sizeMap = {
@@ -15,10 +15,12 @@ const sizeMap = {
   md: 'max-w-lg',
   lg: 'max-w-2xl',
   xl: 'max-w-4xl',
+  full: 'max-w-4xl',
 };
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
   const bodyRef = useRef<HTMLDivElement>(null);
+  const isFull = size === 'full';
 
   useEffect(() => {
     if (!open) return;
@@ -45,6 +47,24 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
   }, [open]);
 
   if (!open) return null;
+
+  // 'full' pins the whole panel to the viewport edges (no flex-centering
+  // math at all), so the header can never end up positioned above the
+  // visible area no matter how tall the form content is.
+  if (isFull) {
+    return (
+      <div className="fixed inset-0 z-50 flex flex-col no-print bg-[var(--cream)]">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-4 border-b border-[var(--line)] shrink-0 bg-[var(--cream)]">
+          <h3 className="text-lg font-extrabold text-[var(--ink)] truncate flex-1 mr-2">{title}</h3>
+          <button onClick={onClose} className="p-2 rounded-lg text-[var(--ink-soft)] hover:bg-[var(--cream-deep)] transition-colors shrink-0" aria-label="Close">
+            <X size={20} />
+          </button>
+        </div>
+        <div ref={bodyRef} className="px-4 sm:px-6 py-5 overflow-y-auto flex-1 w-full max-w-4xl mx-auto" style={{ overflowAnchor: 'none' }}>{children}</div>
+        {footer && <div className="px-4 sm:px-6 py-4 border-t border-[var(--line)] flex flex-wrap justify-end gap-2 shrink-0 bg-[var(--cream)]">{footer}</div>}
+      </div>
+    );
+  }
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-print lm-modal-overlay">
