@@ -1,4 +1,4 @@
-import { type ReactNode, useEffect } from 'react';
+import { type ReactNode, useEffect, useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -18,6 +18,8 @@ const sizeMap = {
 };
 
 export function Modal({ open, onClose, title, children, footer, size = 'md' }: ModalProps) {
+  const bodyRef = useRef<HTMLDivElement>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKey = (e: KeyboardEvent) => { if (e.key === 'Escape') onClose(); };
@@ -29,19 +31,32 @@ export function Modal({ open, onClose, title, children, footer, size = 'md' }: M
     };
   }, [open, onClose]);
 
+  // Always start scrolled to the very top when the modal opens, so the
+  // header and first fields are visible instead of being hidden above the
+  // fold (the browser's scroll-anchoring can otherwise yank the scroll
+  // position down once async content, e.g. quiz questions, loads in).
+  useEffect(() => {
+    if (!open) return;
+    const el = bodyRef.current;
+    if (!el) return;
+    el.scrollTop = 0;
+    const raf = requestAnimationFrame(() => { el.scrollTop = 0; });
+    return () => cancelAnimationFrame(raf);
+  }, [open]);
+
   if (!open) return null;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 no-print lm-modal-overlay">
       <div className="absolute inset-0 bg-[var(--ink)]/40 backdrop-blur-sm" onClick={onClose} />
-      <div className={`relative w-full ${sizeMap[size]} lm-card max-h-[90vh] flex flex-col lm-fade-up lm-modal-panel`}>
+      <div className={`relative w-full ${sizeMap[size]} lm-card max-h-[85vh] flex flex-col lm-fade-up lm-modal-panel`}>
         <div className="flex items-center justify-between px-5 sm:px-6 py-4 border-b border-[var(--line)] shrink-0">
           <h3 className="text-lg font-extrabold text-[var(--ink)] truncate flex-1 mr-2">{title}</h3>
           <button onClick={onClose} className="p-2 rounded-lg text-[var(--ink-soft)] hover:bg-[var(--cream-deep)] transition-colors shrink-0" aria-label="Close">
             <X size={20} />
           </button>
         </div>
-        <div className="px-5 sm:px-6 py-5 overflow-y-auto flex-1">{children}</div>
+        <div ref={bodyRef} className="px-5 sm:px-6 py-5 overflow-y-auto flex-1" style={{ overflowAnchor: 'none' }}>{children}</div>
         {footer && <div className="px-5 sm:px-6 py-4 border-t border-[var(--line)] flex flex-wrap justify-end gap-2 shrink-0">{footer}</div>}
       </div>
     </div>
