@@ -11,6 +11,13 @@ export interface LibraryCategory {
   created_at: string;
 }
 
+export interface CurriculumCategory {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface GradeLevel {
   id: string;
   name: string;
