@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { Plus, Search, Edit2, Trash2, Film, ImageIcon, HelpCircle, GripVertical, X, ArrowUp, ArrowDown, BookOpen, Library, Upload, Link as LinkIcon, Loader2 } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
-import type { Activity, QuizQuestion, ActivityCategory, ContentType, QuizType, StepBreakdownItem, LibraryCategory, GradeLevel } from '@/lib/types';
+import type { Activity, QuizQuestion, ActivityCategory, ContentType, QuizType, StepBreakdownItem, LibraryCategory, CurriculumCategory, GradeLevel } from '@/lib/types';
 import { Card, Button, Input, Textarea, Spinner, EmptyState, Badge } from '@/components/ui';
 import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/Modal';
@@ -19,6 +19,7 @@ export function AdminContent() {
   const [tab, setTab] = useState<Tab>('curriculum');
   const [activities, setActivities] = useState<Activity[]>([]);
   const [categories, setCategories] = useState<LibraryCategory[]>([]);
+  const [curriculumCategories, setCurriculumCategories] = useState<CurriculumCategory[]>([]);
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
   const [loading, setLoading] = useState(true);
   const [query, setQuery] = useState('');
@@ -33,13 +34,15 @@ export function AdminContent() {
 
   async function load() {
     setLoading(true);
-    const [acts, cats, gls] = await Promise.all([
+    const [acts, cats, curCats, gls] = await Promise.all([
       supabase.from('activities').select('*').order('day_number', { ascending: true, nullsFirst: false }),
       supabase.from('library_categories').select('*').order('sort_order', { ascending: true }),
+      supabase.from('curriculum_categories').select('*').order('sort_order', { ascending: true }),
       supabase.from('grade_levels').select('*').order('sort_order', { ascending: true }),
     ]);
     setActivities((acts.data as Activity[]) ?? []);
     setCategories((cats.data as LibraryCategory[]) ?? []);
+    setCurriculumCategories((curCats.data as CurriculumCategory[]) ?? []);
     setGradeLevels((gls.data as GradeLevel[]) ?? []);
     setLoading(false);
   }
@@ -115,9 +118,7 @@ export function AdminContent() {
               </div>
               <select className="lm-input" value={catFilter} onChange={(e) => setCatFilter(e.target.value)}>
                 <option value="all">All categories</option>
-                <option value="focus">Focus</option>
-                <option value="brain">Brain</option>
-                <option value="behaviour">Behaviour</option>
+                {curriculumCategories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)}
               </select>
               <select className="lm-input" value={gradeFilter} onChange={(e) => setGradeFilter(e.target.value)}>
                 <option value="all">All grade levels</option>
@@ -196,7 +197,7 @@ export function AdminContent() {
         </>
       )}
 
-      {showForm && <ActivityForm key={editing?.id ?? 'new'} activity={editing} categories={categories} gradeLevels={gradeLevels} forceType={formType} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); load(); }} />}
+      {showForm && <ActivityForm key={editing?.id ?? 'new'} activity={editing} categories={categories} curriculumCategories={curriculumCategories} gradeLevels={gradeLevels} forceType={formType} onClose={() => setShowForm(false)} onSaved={() => { setShowForm(false); load(); }} />}
 
       <ConfirmDialog
         open={!!confirmDelete}
@@ -259,9 +260,10 @@ function ActivityRow({ a, onEdit, onDelete, showDay }: { a: Activity; onEdit: ()
 
 // ──────────────── Activity form (add/edit, both content types) ────────────────
 
-function ActivityForm({ activity, categories, gradeLevels, forceType, onClose, onSaved }: {
+function ActivityForm({ activity, categories, curriculumCategories, gradeLevels, forceType, onClose, onSaved }: {
   activity: Activity | null;
   categories: LibraryCategory[];
+  curriculumCategories: CurriculumCategory[];
   gradeLevels: GradeLevel[];
   forceType: ContentType;
   onClose: () => void;
@@ -271,7 +273,7 @@ function ActivityForm({ activity, categories, gradeLevels, forceType, onClose, o
   const [day, setDay] = useState(activity?.day_number ?? 0);
   const [title, setTitle] = useState(activity?.title ?? '');
   const [category, setCategory] = useState(
-    activity?.category ?? (contentType === 'library' ? (categories[0]?.name ?? '') : 'focus')
+    activity?.category ?? (contentType === 'library' ? (categories[0]?.name ?? '') : (curriculumCategories[0]?.name ?? ''))
   );
   const [duration, setDuration] = useState(activity?.duration_minutes ?? 10);
   const [gradeLevel, setGradeLevel] = useState(activity?.grade_level ?? '');
@@ -437,11 +439,7 @@ function ActivityForm({ activity, categories, gradeLevels, forceType, onClose, o
             <span className="lm-label block mb-1.5">{isCurriculum ? 'Category' : 'Library category'}</span>
             <select className="lm-input" value={category} onChange={(e) => setCategory(e.target.value)}>
               {isCurriculum ? (
-                <>
-                  <option value="focus">Focus</option>
-                  <option value="brain">Brain</option>
-                  <option value="behaviour">Behaviour</option>
-                </>
+                curriculumCategories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)
               ) : (
                 categories.map((c) => <option key={c.id} value={c.name}>{c.name}</option>)
               )}
