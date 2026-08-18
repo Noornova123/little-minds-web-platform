@@ -1,7 +1,7 @@
 import { type ReactNode } from 'react';
-import { Star, Award, TrendingUp, Heart, Target, Sparkles, Calendar, GraduationCap } from 'lucide-react';
+import { Star, Award, TrendingUp, Heart, Target, Sparkles, Calendar, GraduationCap, MessageSquareText } from 'lucide-react';
 import type { ReportData } from '@/lib/reportData';
-import { computeDomainTrends, computeMonthlyTrend, attendancePct, checkpointAcc, markBadge, generateNarrative, generateSuggestions } from '@/lib/reportData';
+import { computeDomainTrends, computeMonthlyTrend, attendancePct, checkpointAcc, markBadge, generateNarrative, generateSuggestions, groupFeedbackBySubject } from '@/lib/reportData';
 import { renderDomainIcon } from '@/lib/domainIcons';
 
 // A4 dimensions at 96 DPI: 794px x 1123px. We render at 2x scale for PDF clarity.
@@ -13,7 +13,7 @@ interface TemplateProps {
 }
 
 export function PdfReportTemplate({ data }: TemplateProps) {
-  const { student, school, classRow, marks, notes, achievements, academicYear } = data;
+  const { student, school, classRow, marks, notes, achievements, teacherFeedback, academicYear } = data;
   const brand = school.brand_color || '#c66b3d';
   const firstName = student.name.split(' ')[0];
 
@@ -23,6 +23,12 @@ export function PdfReportTemplate({ data }: TemplateProps) {
   const cpAcc = checkpointAcc(data);
   const narrative = generateNarrative(data);
   const suggestions = generateSuggestions(data);
+  const feedbackBySubject = groupFeedbackBySubject(teacherFeedback);
+
+  function monthLabel(m: string) {
+    const [y, mo] = m.split('-');
+    return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+  }
 
   // Group marks by exam+year
   const marksByExam: Record<string, typeof marks> = {};
@@ -217,9 +223,36 @@ export function PdfReportTemplate({ data }: TemplateProps) {
         )}
       </PdfPage>
 
-      {/* ──────────── 6. WHERE TO FOCUS NEXT ──────────── */}
+      {/* ──────────── 6. SUBJECT TEACHER FEEDBACK ──────────── */}
+      {feedbackBySubject.length > 0 && (
+        <PdfPage brand={brand}>
+          <SectionHeader number="5" title="Subject Teacher Feedback" brand={brand} icon={<MessageSquareText size={20} color={brand} />} />
+          <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 20 }}>
+            {feedbackBySubject.map(({ subject, entries }) => (
+              <div key={subject} style={{ padding: 20, background: '#faf8f5', borderRadius: 16, border: `1px solid ${brand}20` }}>
+                <h4 style={{ fontSize: 15, fontWeight: 800, color: '#18181b', margin: '0 0 12px' }}>{subject}</h4>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 10 }}>
+                  {entries.map((f) => (
+                    <div key={f.id} style={{ display: 'flex', gap: 12, padding: '10px 14px', background: '#fff', borderRadius: 12, border: '1px solid #e4e4e7' }}>
+                      <div style={{ minWidth: 74, flexShrink: 0 }}>
+                        <span style={{ fontSize: 11, fontWeight: 700, color: brand }}>{monthLabel(f.month)}</span>
+                      </div>
+                      <div style={{ flex: 1 }}>
+                        <p style={{ fontSize: 13, color: '#3f3f46', margin: 0, lineHeight: 1.5 }}>{f.feedback_text}</p>
+                        <p style={{ fontSize: 10, color: '#a1a1aa', margin: '4px 0 0' }}>— {f.teacher?.name ?? 'Teacher'}</p>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            ))}
+          </div>
+        </PdfPage>
+      )}
+
+      {/* ──────────── 7. WHERE TO FOCUS NEXT ──────────── */}
       <PdfPage brand={brand}>
-        <SectionHeader number="5" title="Where to Focus Next" brand={brand} icon={<Sparkles size={20} color={brand} />} />
+        <SectionHeader number="6" title="Where to Focus Next" brand={brand} icon={<Sparkles size={20} color={brand} />} />
         <div style={{ marginTop: 24, display: 'flex', flexDirection: 'column', gap: 16 }}>
           {suggestions.map((s, i) => (
             <div key={i} style={{ display: 'flex', gap: 16, padding: 20, background: '#faf8f5', borderRadius: 16, border: `1px solid ${brand}20` }}>
