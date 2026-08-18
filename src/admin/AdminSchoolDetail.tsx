@@ -19,7 +19,14 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
   const [showTeacher, setShowTeacher] = useState(false);
   const [showClass, setShowClass] = useState(false);
   const [showUpload, setShowUpload] = useState<string | null>(null); // class id
-  const [confirmDelete, setConfirmDelete] = useState<{ kind: 'teacher' | 'class'; id: string; name: string } | null>(null);
+  const [showAddStudent, setShowAddStudent] = useState<string | null>(null); // class id
+  const [confirmDelete, setConfirmDelete] = useState<{ kind: 'teacher' | 'class' | 'student'; id: string; name: string } | null>(null);
+
+  // add single student form
+  const [sName, setSName] = useState('');
+  const [sRoll, setSRoll] = useState('');
+  const [sBusy, setSBusy] = useState(false);
+  const [sErr, setSErr] = useState<string | null>(null);
 
   // teacher form
   const [tName, setTName] = useState('');
@@ -144,10 +151,25 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
     }
   }
 
+  async function addStudent(e: React.FormEvent) {
+    e.preventDefault();
+    if (!showAddStudent || !sName.trim()) return;
+    setSBusy(true); setSErr(null);
+    const existing = studentsByClass[showAddStudent] ?? [];
+    const rollValue = sRoll.trim() || String(existing.length + 1).padStart(2, '0');
+    const { error } = await supabase.from('students').insert({ class_id: showAddStudent, name: sName.trim(), roll_number: rollValue });
+    setSBusy(false);
+    if (error) { setSErr(error.message); return; }
+    setShowAddStudent(null); setSName(''); setSRoll('');
+    load();
+  }
+
   async function doDelete() {
     if (!confirmDelete) return;
     if (confirmDelete.kind === 'teacher') {
       await supabase.from('teachers').delete().eq('id', confirmDelete.id);
+    } else if (confirmDelete.kind === 'student') {
+      await supabase.from('students').delete().eq('id', confirmDelete.id);
     } else {
       await supabase.from('classes').delete().eq('id', confirmDelete.id);
     }
@@ -254,6 +276,7 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
                       <p className="text-xs text-[var(--ink-soft)]">{teacher ? teacher.name : 'Unassigned'} · {sts.length} students{c.grade_level ? ` · ${c.grade_level}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
+                      <Button size="sm" variant="ghost" onClick={() => { setShowAddStudent(c.id); setSErr(null); setSName(''); setSRoll(''); }}><Plus size={14} /> <span className="hidden sm:inline">Add student</span><span className="sm:hidden">Add</span></Button>
                       <Button size="sm" variant="ghost" onClick={() => { setShowUpload(c.id); setUploadErr(null); setUploadResult(null); }}><Upload size={14} /> <span className="hidden sm:inline">Upload CSV</span><span className="sm:hidden">CSV</span></Button>
                       <button onClick={() => setConfirmDelete({ kind: 'class', id: c.id, name: c.name })} className="p-2 rounded-lg text-[var(--ink-soft)] hover:bg-[#fef2f2] hover:text-[#dc2626]">
                         <Trash2 size={16} />
@@ -262,10 +285,18 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
                   </div>
                   {sts.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
-                      {sts.slice(0, 12).map((s) => (
-                        <span key={s.id} className="lm-chip bg-[var(--cream-deep)] text-[var(--ink-soft)]">{s.roll_number}. {s.name}</span>
+                      {sts.map((s) => (
+                        <span key={s.id} className="lm-chip bg-[var(--cream-deep)] text-[var(--ink-soft)] group">
+                          {s.roll_number}. {s.name}
+                          <button
+                            onClick={() => setConfirmDelete({ kind: 'student', id: s.id, name: s.name })}
+                            className="ml-1 -mr-0.5 text-[var(--ink-soft)]/60 hover:text-[#dc2626]"
+                            aria-label={`Remove ${s.name}`}
+                          >
+                            ×
+                          </button>
+                        </span>
                       ))}
-                      {sts.length > 12 && <span className="lm-chip bg-[var(--cream-deep)] text-[var(--ink-soft)]">+{sts.length - 12} more</span>}
                     </div>
                   )}
                 </div>
@@ -328,6 +359,25 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
         </form>
       </Modal>
 
+      {/* Add single student modal */}
+      <Modal
+        open={!!showAddStudent}
+        onClose={() => setShowAddStudent(null)}
+        title="Add student"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowAddStudent(null)}>Cancel</Button>
+            <Button onClick={addStudent} disabled={sBusy || !sName.trim()}>{sBusy ? 'Adding…' : 'Add student'}</Button>
+          </>
+        }
+      >
+        <form onSubmit={addStudent} className="space-y-4">
+          <Input label="Student name" value={sName} onChange={(e) => setSName(e.target.value)} placeholder="e.g. Aarav Sharma" required autoFocus />
+          <Input label="Roll number (optional)" value={sRoll} onChange={(e) => setSRoll(e.target.value)} placeholder="Auto-assigned if left blank" />
+          {sErr && <p className="text-sm font-semibold text-[#dc2626] bg-[#fef2f2] rounded-lg px-3 py-2">{sErr}</p>}
+        </form>
+      </Modal>
+
       {/* Upload CSV modal */}
       <Modal
         open={!!showUpload}
@@ -360,10 +410,14 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
         onConfirm={doDelete}
-        title={`Delete ${confirmDelete?.kind}?`}
-        message={confirmDelete?.kind === 'class'
-          ? `Deleting "${confirmDelete?.name}" will also remove all its students, attendance, and progress. This cannot be undone.`
-          : `Delete teacher "${confirmDelete?.name}"? They will no longer be able to sign in.`}
+        title={confirmDelete?.kind === 'student' ? 'Remove student?' : `Delete ${confirmDelete?.kind}?`}
+        message={
+          confirmDelete?.kind === 'class'
+            ? `Deleting "${confirmDelete?.name}" will also remove all its students, attendance, and progress. This cannot be undone.`
+            : confirmDelete?.kind === 'student'
+            ? `Remove "${confirmDelete?.name}" from this class? Their attendance, marks, and notes history will also be removed. This cannot be undone.`
+            : `Delete teacher "${confirmDelete?.name}"? They will no longer be able to sign in.`
+        }
         confirmLabel="Delete"
         danger
       />
