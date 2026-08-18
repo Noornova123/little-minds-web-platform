@@ -12,6 +12,7 @@ import { ClassReport, StudentReport } from '@/teacher/Reports';
 import { TeacherProfile } from '@/teacher/TeacherProfile';
 import { TeacherCalendar } from '@/teacher/TeacherCalendar';
 import { TeacherHelp } from '@/teacher/TeacherHelp';
+import { TeacherFeedback } from '@/teacher/TeacherFeedback';
 
 export function TeacherApp() {
   const path = useHashRoute();
@@ -26,6 +27,7 @@ export function TeacherApp() {
           matchPath('/dashboard/checkpoint/:activityId', path) ? <DailyCheckpoint activityId={matchPath('/dashboard/checkpoint/:activityId', path)!.activityId} /> :
           path.startsWith('/dashboard/monthly') ? <MonthlyCheck /> :
           path.startsWith('/dashboard/marks') ? <MarksEntry /> :
+          path.startsWith('/dashboard/feedback') ? <TeacherFeedback /> :
           matchPath('/dashboard/reports/:studentId', path) ? <StudentReport studentId={matchPath('/dashboard/reports/:studentId', path)!.studentId} /> :
           path.startsWith('/dashboard/reports') ? <ClassReport /> :
           path.startsWith('/dashboard/profile') ? <TeacherProfile /> :
