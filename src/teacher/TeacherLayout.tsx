@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Brain, LogOut, Menu, X, Home, Library, FileText, User, CalendarDays, LifeBuoy, ChevronLeft, School, ClipboardList } from 'lucide-react';
+import { Brain, LogOut, Menu, X, Home, Library, FileText, User, CalendarDays, LifeBuoy, ChevronLeft, School, ClipboardList, MessageSquarePlus } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { navigate, useHashRoute, matchPath } from '@/lib/router';
 import { supabase } from '@/lib/supabase';
@@ -18,6 +18,7 @@ export function TeacherLayout({ children }: { children: React.ReactNode }) {
   const onProfile = path.startsWith('/dashboard/profile');
   const onCalendar = path.startsWith('/dashboard/calendar');
   const onMarks = path.startsWith('/dashboard/marks');
+  const onFeedback = path.startsWith('/dashboard/feedback');
   const onHelp = path.startsWith('/dashboard/help');
 
   useEffect(() => {
@@ -68,6 +69,7 @@ export function TeacherLayout({ children }: { children: React.ReactNode }) {
                 <MenuItem icon={<FileText size={18} />} label="Reports" active={onReports} onClick={() => navigate('/dashboard/reports')} />
                 <MenuItem icon={<CalendarDays size={18} />} label="Calendar" active={onCalendar} onClick={() => navigate('/dashboard/calendar')} />
                 <MenuItem icon={<ClipboardList size={18} />} label="Marks Entry" active={onMarks} onClick={() => navigate('/dashboard/marks')} />
+                <MenuItem icon={<MessageSquarePlus size={18} />} label="Feedback" active={onFeedback} onClick={() => navigate('/dashboard/feedback')} />
                 <MenuItem icon={<User size={18} />} label="My Profile" active={onProfile} onClick={() => navigate('/dashboard/profile')} />
                 <MenuItem icon={<LifeBuoy size={18} />} label="Help & Resources" active={onHelp} onClick={() => navigate('/dashboard/help')} />
                 <div className="my-2 border-t border-[var(--line)]" />
@@ -117,6 +119,7 @@ function showBack(path: string): boolean {
   if (path.startsWith('/dashboard/profile')) return true;
   if (path.startsWith('/dashboard/calendar')) return true;
   if (path.startsWith('/dashboard/marks')) return true;
+  if (path.startsWith('/dashboard/feedback')) return true;
   if (path.startsWith('/dashboard/help')) return true;
   return false;
 }
