@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, TrendingUp, TrendingDown, Minus, Printer, ArrowRight, Users, Library, Heart, Wrench, Brain, Target, ClipboardList, FileDown, Loader2, Layers, type LucideIcon } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { navigate } from '@/lib/router';
-import type { Activity, AttendanceRow, DailyCheckpoint, MonthlyCheck, Student, LibraryCompletion, ChecklistStatement, ChecklistResponse, ChecklistDomainRow, AnecdotalNote, ExamMark, Achievement } from '@/lib/types';
+import type { Activity, AttendanceRow, DailyCheckpoint, MonthlyCheck, Student, LibraryCompletion, ChecklistStatement, ChecklistResponse, ChecklistDomainRow, AnecdotalNote, ExamMark, Achievement, TeacherFeedback } from '@/lib/types';
 import { renderDomainIcon } from '@/lib/domainIcons';
 import { Card, Spinner, EmptyState, Badge } from '@/components/ui';
 import { LineChart, BarChart } from '@/components/Charts';
@@ -11,7 +11,7 @@ import { ClassSelector } from '@/teacher/ClassSelector';
 import { QuickNoteButton, NotesList } from '@/teacher/QuickNote';
 import { AchievementsSection } from '@/teacher/Achievements';
 import { BulkReportGenerator } from '@/teacher/BulkReportGenerator';
-import { loadReportData } from '@/lib/reportData';
+import { loadReportData, groupFeedbackBySubject } from '@/lib/reportData';
 import { generatePdfFromElement, reportFileName } from '@/lib/pdfGenerator';
 import { PdfReportTemplate } from '@/components/PdfReportTemplate';
 
@@ -205,6 +205,7 @@ export function StudentReport({ studentId }: { studentId: string }) {
   const [notes, setNotes] = useState<AnecdotalNote[]>([]);
   const [marks, setMarks] = useState<ExamMark[]>([]);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+  const [teacherFeedback, setTeacherFeedback] = useState<TeacherFeedback[]>([]);
   const [pdfLoading, setPdfLoading] = useState(false);
   const [dataLoading, setDataLoading] = useState(true);
 
@@ -257,7 +258,7 @@ export function StudentReport({ studentId }: { studentId: string }) {
       if (!active) return;
       setStudent(st as Student | null);
       if (!st) { setDataLoading(false); return; }
-      const [a, c, m, stmts, resp, nts, doms, mk, ach] = await Promise.all([
+      const [a, c, m, stmts, resp, nts, doms, mk, ach, fb] = await Promise.all([
         supabase.from('attendance').select('*').eq('student_id', studentId).order('date'),
         supabase.from('daily_checkpoints').select('*').eq('student_id', studentId).order('date'),
         supabase.from('monthly_checks').select('*').eq('student_id', studentId).order('month'),
@@ -267,6 +268,7 @@ export function StudentReport({ studentId }: { studentId: string }) {
         supabase.from('checklist_domains').select('*').order('display_order'),
         supabase.from('exam_marks').select('*').eq('student_id', studentId).order('academic_year', { ascending: false }),
         supabase.from('achievements').select('*').eq('student_id', studentId).order('achievement_date', { ascending: false }),
+        supabase.from('teacher_feedback').select('*, teacher:teachers(name)').eq('student_id', studentId).order('month', { ascending: true }),
       ]);
       if (!active) return;
       setAtt((a.data as AttendanceRow[]) ?? []);
@@ -278,6 +280,7 @@ export function StudentReport({ studentId }: { studentId: string }) {
       setDomains((doms.data as ChecklistDomainRow[]) ?? []);
       setMarks((mk.data as ExamMark[]) ?? []);
       setAchievements((ach.data as Achievement[]) ?? []);
+      setTeacherFeedback((fb.data as TeacherFeedback[]) ?? []);
       setDataLoading(false);
     })();
     return () => { active = false; };
@@ -424,6 +427,30 @@ export function StudentReport({ studentId }: { studentId: string }) {
         <div className="mb-6 no-print">
           <AchievementsSection studentId={student.id} studentName={student.name} achievements={achievements} onReload={loadAchievements} />
         </div>
+
+        {/* Subject teacher feedback */}
+        {teacherFeedback.length > 0 && (
+          <div className="mb-6">
+            <h3 className="font-extrabold text-[var(--ink)] mb-3">Subject teacher feedback</h3>
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {groupFeedbackBySubject(teacherFeedback).map(({ subject, entries }) => (
+                <div key={subject} className="rounded-xl bg-[var(--cream-deep)] p-3">
+                  <p className="text-xs font-extrabold uppercase tracking-wide text-[var(--terracotta)] mb-2">{subject}</p>
+                  <div className="space-y-2">
+                    {entries.map((f) => (
+                      <div key={f.id}>
+                        <p className="text-[11px] font-bold text-[var(--ink-soft)]">
+                          {new Date(f.month + '-01').toLocaleDateString(undefined, { month: 'short', year: 'numeric' })} · {f.teacher?.name ?? 'Teacher'}
+                        </p>
+                        <p className="text-sm font-semibold text-[var(--ink)]">{f.feedback_text}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
 
         {cp.length === 0 && att.length === 0 && mcSorted.length === 0 && responses.length === 0 && marks.length === 0 && (
           <EmptyState title="No data yet" hint="This student's growth charts will appear once attendance, checkpoints, or the monthly checklist are recorded." />
