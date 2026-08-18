@@ -1,5 +1,5 @@
 import { supabase } from '@/lib/supabase';
-import type { Student, School, ClassRow, ExamMark, AnecdotalNote, DailyCheckpoint, MonthlyCheck, ChecklistStatement, ChecklistResponse, ChecklistDomainRow, Achievement, AttendanceRow } from '@/lib/types';
+import type { Student, School, ClassRow, ExamMark, AnecdotalNote, DailyCheckpoint, MonthlyCheck, ChecklistStatement, ChecklistResponse, ChecklistDomainRow, Achievement, AttendanceRow, TeacherFeedback } from '@/lib/types';
 
 export interface ReportData {
   student: Student;
@@ -14,6 +14,7 @@ export interface ReportData {
   responses: ChecklistResponse[];
   domains: ChecklistDomainRow[];
   achievements: Achievement[];
+  teacherFeedback: TeacherFeedback[];
   academicYear: string;
 }
 
@@ -30,7 +31,7 @@ export async function loadReportData(studentId: string): Promise<ReportData> {
   const school = sch as School | null;
   if (!school) throw new Error('School not found');
 
-  const [mk, nts, cp, mc, att, stmts, resp, doms, ach] = await Promise.all([
+  const [mk, nts, cp, mc, att, stmts, resp, doms, ach, fb] = await Promise.all([
     supabase.from('exam_marks').select('*').eq('student_id', studentId).order('academic_year', { ascending: false }),
     supabase.from('anecdotal_notes').select('*').eq('student_id', studentId).order('date', { ascending: false }),
     supabase.from('daily_checkpoints').select('*').eq('student_id', studentId).order('date'),
@@ -40,6 +41,7 @@ export async function loadReportData(studentId: string): Promise<ReportData> {
     supabase.from('checklist_responses').select('*').eq('student_id', studentId).order('month'),
     supabase.from('checklist_domains').select('*').order('display_order'),
     supabase.from('achievements').select('*').eq('student_id', studentId).order('achievement_date', { ascending: false }),
+    supabase.from('teacher_feedback').select('*, teacher:teachers(name)').eq('student_id', studentId).order('month', { ascending: true }),
   ]);
 
   const academicYear = new Date().getFullYear().toString();
@@ -57,8 +59,22 @@ export async function loadReportData(studentId: string): Promise<ReportData> {
     responses: (resp.data as ChecklistResponse[]) ?? [],
     domains: (doms.data as ChecklistDomainRow[]) ?? [],
     achievements: (ach.data as Achievement[]) ?? [],
+    teacherFeedback: (fb.data as TeacherFeedback[]) ?? [],
     academicYear,
   };
+}
+
+// Groups teacher feedback by subject, each with its entries sorted by month.
+export function groupFeedbackBySubject(feedback: TeacherFeedback[]): { subject: string; entries: TeacherFeedback[] }[] {
+  const bySubject = new Map<string, TeacherFeedback[]>();
+  for (const f of feedback) {
+    const list = bySubject.get(f.subject) ?? [];
+    list.push(f);
+    bySubject.set(f.subject, list);
+  }
+  return [...bySubject.entries()]
+    .map(([subject, entries]) => ({ subject, entries: entries.sort((a, b) => a.month.localeCompare(b.month)) }))
+    .sort((a, b) => a.subject.localeCompare(b.subject));
 }
 
 export interface DomainTrend {
