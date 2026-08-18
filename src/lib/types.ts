@@ -263,3 +263,14 @@ export interface Achievement {
   achievement_date: string;
   created_at: string;
 }
+
+export interface TeacherFeedback {
+  id: string;
+  student_id: string;
+  teacher_id: string;
+  subject: string;
+  month: string; // 'YYYY-MM'
+  feedback_text: string;
+  created_at: string;
+  teacher?: { name: string } | null; // populated when fetched with a join
+}
