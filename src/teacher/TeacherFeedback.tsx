@@ -1,13 +1,11 @@
 import { useEffect, useMemo, useState } from 'react';
-import { MessageSquarePlus, Loader2, Trash2, Pencil, ChevronDown, ChevronUp } from 'lucide-react';
+import { ArrowLeft, Loader2, Pencil, Trash2, Check, X as XIcon, MessageSquareText } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { useAuth } from '@/lib/auth';
-import type { AcademicSubject, Student, TeacherFeedback as Feedback } from '@/lib/types';
+import { navigate } from '@/lib/router';
+import type { AcademicSubject, Student, ClassRow, TeacherFeedback as Feedback } from '@/lib/types';
 import { Card, Button, Spinner, EmptyState, Badge } from '@/components/ui';
-import { Modal } from '@/components/Modal';
 import { ConfirmDialog } from '@/components/Modal';
-import { useClassContext } from '@/teacher/useClassContext';
-import { ClassSelector } from '@/teacher/ClassSelector';
 
 function currentMonth() {
   return new Date().toISOString().slice(0, 7); // 'YYYY-MM'
@@ -18,7 +16,12 @@ function monthLabel(m: string) {
   return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
 }
 
-// Last 12 months, most recent first, for the month picker.
+function monthLabelShort(m: string) {
+  const [y, mo] = m.split('-');
+  return new Date(Number(y), Number(mo) - 1, 1).toLocaleDateString(undefined, { month: 'short', year: 'numeric' });
+}
+
+// Last 12 months, most recent first.
 function lastMonths(n = 12): string[] {
   const out: string[] = [];
   const d = new Date();
@@ -30,210 +33,257 @@ function lastMonths(n = 12): string[] {
   return out;
 }
 
-export function TeacherFeedback() {
+export function TeacherFeedbackForm({ studentId }: { studentId: string }) {
   const { teacher } = useAuth();
-  const { classes, selectedClass, students, loading, selectClass } = useClassContext();
+  const [student, setStudent] = useState<Student | null>(null);
+  const [classRow, setClassRow] = useState<ClassRow | null>(null);
   const [subjects, setSubjects] = useState<AcademicSubject[]>([]);
-  const [feedbackByStudent, setFeedbackByStudent] = useState<Record<string, Feedback[]>>({});
-  const [fbLoading, setFbLoading] = useState(true);
-  const [expanded, setExpanded] = useState<string | null>(null);
-
-  const [openFor, setOpenFor] = useState<Student | null>(null);
-  const [editing, setEditing] = useState<Feedback | null>(null);
-  const [subject, setSubject] = useState('');
+  const [feedback, setFeedback] = useState<Feedback[]>([]);
+  const [loading, setLoading] = useState(true);
   const [month, setMonth] = useState(currentMonth());
-  const [text, setText] = useState('');
-  const [busy, setBusy] = useState(false);
-  const [err, setErr] = useState<string | null>(null);
+
+  // draft text per subject for the currently selected month, keyed by subject name
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [savingSubject, setSavingSubject] = useState<string | null>(null);
+  const [rowErr, setRowErr] = useState<Record<string, string>>({});
+
+  // history row inline-edit state
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editText, setEditText] = useState('');
+  const [historyBusy, setHistoryBusy] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState<Feedback | null>(null);
 
-  useEffect(() => {
-    if (!teacher) return;
-    supabase.from('academic_subjects').select('*').eq('school_id', teacher.school_id).order('display_order').then(({ data }) => {
-      setSubjects((data as AcademicSubject[]) ?? []);
-    });
-  }, [teacher]);
-
-  async function loadFeedback() {
-    if (students.length === 0) { setFeedbackByStudent({}); setFbLoading(false); return; }
-    setFbLoading(true);
-    const { data } = await supabase
+  async function load() {
+    setLoading(true);
+    const { data: st } = await supabase.from('students').select('*').eq('id', studentId).maybeSingle();
+    setStudent(st as Student | null);
+    if (st) {
+      const { data: cls } = await supabase.from('classes').select('*').eq('id', (st as Student).class_id).maybeSingle();
+      setClassRow(cls as ClassRow | null);
+      if (cls && teacher) {
+        const { data: subs } = await supabase.from('academic_subjects').select('*').eq('school_id', (cls as ClassRow).school_id).order('display_order');
+        setSubjects((subs as AcademicSubject[]) ?? []);
+      }
+    }
+    const { data: fb } = await supabase
       .from('teacher_feedback')
       .select('*, teacher:teachers(name)')
-      .in('student_id', students.map((s) => s.id))
+      .eq('student_id', studentId)
       .order('month', { ascending: false });
-    const map: Record<string, Feedback[]> = {};
-    for (const row of (data as Feedback[]) ?? []) {
-      (map[row.student_id] ??= []).push(row);
+    setFeedback((fb as Feedback[]) ?? []);
+    setLoading(false);
+  }
+
+  useEffect(() => { load(); }, [studentId]);
+
+  // Whenever the month changes, seed the draft textboxes from existing entries for that month.
+  useEffect(() => {
+    const next: Record<string, string> = {};
+    for (const f of feedback) {
+      if (f.month === month && f.teacher_id === teacher?.id) next[f.subject] = f.feedback_text;
     }
-    setFeedbackByStudent(map);
-    setFbLoading(false);
+    setDrafts(next);
+    setRowErr({});
+  }, [month, feedback, teacher?.id]);
+
+  const months = useMemo(() => {
+    const set = new Set(lastMonths());
+    for (const f of feedback) set.add(f.month);
+    return [...set].sort((a, b) => b.localeCompare(a));
+  }, [feedback]);
+
+  // Existing entry (any teacher) for a given subject in the selected month.
+  function entryFor(subject: string): Feedback | undefined {
+    return feedback.find((f) => f.subject === subject && f.month === month);
   }
 
-  useEffect(() => { loadFeedback(); }, [students]);
-
-  function openAdd(student: Student) {
-    setOpenFor(student);
-    setEditing(null);
-    setSubject(subjects[0]?.name ?? '');
-    setMonth(currentMonth());
-    setText('');
-    setErr(null);
+  async function saveRow(subject: string) {
+    if (!teacher || !student) return;
+    const text = (drafts[subject] ?? '').trim();
+    if (!text) return;
+    setSavingSubject(subject);
+    setRowErr((p) => ({ ...p, [subject]: '' }));
+    const existing = feedback.find((f) => f.subject === subject && f.month === month && f.teacher_id === teacher.id);
+    const { error } = existing
+      ? await supabase.from('teacher_feedback').update({ feedback_text: text }).eq('id', existing.id)
+      : await supabase.from('teacher_feedback').insert({ student_id: student.id, teacher_id: teacher.id, subject, month, feedback_text: text });
+    setSavingSubject(null);
+    if (error) { setRowErr((p) => ({ ...p, [subject]: error.message })); return; }
+    load();
   }
 
-  function openEdit(student: Student, fb: Feedback) {
-    setOpenFor(student);
-    setEditing(fb);
-    setSubject(fb.subject);
-    setMonth(fb.month);
-    setText(fb.feedback_text);
-    setErr(null);
+  function startEditHistory(f: Feedback) {
+    setEditingId(f.id);
+    setEditText(f.feedback_text);
   }
 
-  async function save() {
-    if (!openFor || !teacher || !subject || !text.trim()) return;
-    setBusy(true); setErr(null);
-    if (editing) {
-      const { error } = await supabase.from('teacher_feedback')
-        .update({ subject, month, feedback_text: text.trim() })
-        .eq('id', editing.id);
-      setBusy(false);
-      if (error) { setErr(error.message); return; }
-    } else {
-      const { error } = await supabase.from('teacher_feedback').insert({
-        student_id: openFor.id,
-        teacher_id: teacher.id,
-        subject,
-        month,
-        feedback_text: text.trim(),
-      });
-      setBusy(false);
-      if (error) { setErr(error.message); return; }
-    }
-    setOpenFor(null);
-    loadFeedback();
+  async function saveHistoryEdit() {
+    if (!editingId || !editText.trim()) return;
+    setHistoryBusy(true);
+    await supabase.from('teacher_feedback').update({ feedback_text: editText.trim() }).eq('id', editingId);
+    setHistoryBusy(false);
+    setEditingId(null);
+    load();
   }
 
-  async function doDelete() {
+  async function doDeleteHistory() {
     if (!confirmDelete) return;
     await supabase.from('teacher_feedback').delete().eq('id', confirmDelete.id);
     setConfirmDelete(null);
-    loadFeedback();
+    load();
   }
 
-  const months = useMemo(() => lastMonths(), []);
+  if (loading) return <Spinner label="Loading student…" />;
+  if (!student) return <Card><EmptyState title="Student not found" /></Card>;
 
-  if (loading) return <Spinner label="Loading class…" />;
+  const history = [...feedback].sort((a, b) => b.month.localeCompare(a.month) || b.created_at.localeCompare(a.created_at));
 
   return (
-    <div className="space-y-5 lm-fade-up">
-      <div className="flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-[var(--ink)]" style={{ fontFamily: 'Fraunces, serif' }}>Feedback</h1>
-          <p className="text-sm text-[var(--ink-soft)] mt-0.5">Leave your subject's monthly notes for each student — they roll into the yearly report.</p>
-        </div>
-        <ClassSelector classes={classes} selected={selectedClass} onSelect={selectClass} />
-      </div>
+    <div className="space-y-6 lm-fade-up max-w-4xl mx-auto">
+      <button onClick={() => navigate('/dashboard/feedback')} className="inline-flex items-center gap-1.5 text-sm font-bold text-[var(--ink-soft)] hover:text-[var(--terracotta)]">
+        <ArrowLeft size={16} /> Back to class
+      </button>
 
-      {students.length === 0 ? (
-        <Card><EmptyState icon={<MessageSquarePlus size={36} />} title="No students in this class yet" /></Card>
-      ) : subjects.length === 0 ? (
+      <Card className="p-5 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 className="text-2xl font-extrabold text-[var(--ink)]" style={{ fontFamily: 'Fraunces, serif' }}>{student.name}</h1>
+          <p className="text-sm text-[var(--ink-soft)] mt-0.5">Roll no. {student.roll_number}{classRow ? ` · ${classRow.name}` : ''} · {feedback.length} feedback entr{feedback.length === 1 ? 'y' : 'ies'} total</p>
+        </div>
+        <Badge tone="focus"><MessageSquareText size={12} className="inline mr-1" />Subject feedback</Badge>
+      </Card>
+
+      {subjects.length === 0 ? (
         <Card className="p-5"><EmptyState title="No subjects set up yet" hint="Ask your admin to add subjects under Academic Marks so you can tag your feedback." /></Card>
       ) : (
-        <div className="space-y-3">
-          {students.map((s) => {
-            const fbs = feedbackByStudent[s.id] ?? [];
-            const isOpen = expanded === s.id;
-            return (
-              <Card key={s.id} className="p-4">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
-                    <p className="font-bold text-[var(--ink)]">{s.roll_number}. {s.name}</p>
-                    <p className="text-xs text-[var(--ink-soft)]">{fbs.length} feedback entr{fbs.length === 1 ? 'y' : 'ies'}</p>
-                  </div>
-                  <div className="flex items-center gap-2 shrink-0">
-                    <Button size="sm" onClick={() => openAdd(s)}><MessageSquarePlus size={14} /> <span className="hidden sm:inline">Add feedback</span></Button>
-                    {fbs.length > 0 && (
-                      <button onClick={() => setExpanded(isOpen ? null : s.id)} className="p-2 rounded-lg text-[var(--ink-soft)] hover:bg-[var(--cream-deep)]">
-                        {isOpen ? <ChevronUp size={16} /> : <ChevronDown size={16} />}
-                      </button>
-                    )}
-                  </div>
-                </div>
-                {isOpen && (
-                  <div className="mt-3 pt-3 border-t border-[var(--line)] space-y-2">
-                    {fbLoading ? <Spinner label="Loading…" /> : fbs.map((fb) => (
-                      <div key={fb.id} className="flex items-start gap-2 rounded-xl bg-[var(--cream-deep)] p-3">
-                        <div className="flex-1 min-w-0">
-                          <div className="flex items-center gap-1.5 flex-wrap mb-1">
-                            <Badge tone="focus">{fb.subject}</Badge>
-                            <span className="text-xs font-bold text-[var(--ink-soft)]">{monthLabel(fb.month)}</span>
-                            <span className="text-xs text-[var(--ink-soft)]">· {fb.teacher?.name ?? 'Teacher'}</span>
+        <Card className="p-5">
+          <div className="flex items-center justify-between flex-wrap gap-3 mb-4">
+            <h2 className="font-extrabold text-[var(--ink)]">This month's feedback</h2>
+            <label className="flex items-center gap-2">
+              <span className="lm-label">Month</span>
+              <select className="lm-input w-auto" value={month} onChange={(e) => setMonth(e.target.value)}>
+                {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
+              </select>
+            </label>
+          </div>
+
+          <div className="overflow-x-auto -mx-5 px-5">
+            <table className="w-full text-sm min-w-[560px]">
+              <thead>
+                <tr className="text-left text-xs font-extrabold uppercase tracking-wide text-[var(--ink-soft)] border-b border-[var(--line)]">
+                  <th className="py-2 pr-3 w-32">Subject</th>
+                  <th className="py-2 pr-3">Feedback for {monthLabelShort(month)}</th>
+                  <th className="py-2 pl-3 w-24 text-right">Action</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--line)]">
+                {subjects.map((sub) => {
+                  const existing = entryFor(sub.name);
+                  const isOther = existing && existing.teacher_id !== teacher?.id;
+                  return (
+                    <tr key={sub.id} className="align-top">
+                      <td className="py-3 pr-3 font-bold text-[var(--ink)]">{sub.name}</td>
+                      <td className="py-3 pr-3">
+                        {isOther ? (
+                          <div className="rounded-lg bg-[var(--cream-deep)] px-3 py-2">
+                            <p className="text-sm text-[var(--ink)]">{existing!.feedback_text}</p>
+                            <p className="text-xs text-[var(--ink-soft)] mt-1">— {existing!.teacher?.name ?? 'Another teacher'}, already filled</p>
                           </div>
-                          <p className="text-sm font-semibold text-[var(--ink)]">{fb.feedback_text}</p>
-                        </div>
-                        {fb.teacher_id === teacher?.id && (
-                          <div className="flex items-center gap-1 shrink-0">
-                            <button onClick={() => openEdit(s, fb)} className="p-1.5 text-[var(--ink-soft)] hover:text-[var(--terracotta)]"><Pencil size={14} /></button>
-                            <button onClick={() => setConfirmDelete(fb)} className="p-1.5 text-[var(--ink-soft)] hover:text-[#dc2626]"><Trash2 size={14} /></button>
-                          </div>
+                        ) : (
+                          <>
+                            <textarea
+                              className="lm-input h-20 text-sm"
+                              placeholder={`e.g. Doing well in ${sub.name}, needs more practice with…`}
+                              value={drafts[sub.name] ?? ''}
+                              onChange={(e) => setDrafts((p) => ({ ...p, [sub.name]: e.target.value }))}
+                              maxLength={500}
+                            />
+                            <div className="flex items-center justify-between mt-1">
+                              <span className="text-[11px] text-[var(--ink-soft)]">{(drafts[sub.name] ?? '').length}/500</span>
+                              {rowErr[sub.name] && <span className="text-[11px] font-semibold text-[#dc2626]">{rowErr[sub.name]}</span>}
+                            </div>
+                          </>
                         )}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </Card>
-            );
-          })}
-        </div>
+                      </td>
+                      <td className="py-3 pl-3 text-right">
+                        {!isOther && (
+                          <Button
+                            size="sm"
+                            onClick={() => saveRow(sub.name)}
+                            disabled={savingSubject === sub.name || !(drafts[sub.name] ?? '').trim()}
+                          >
+                            {savingSubject === sub.name ? <Loader2 size={14} className="animate-spin" /> : existing ? 'Update' : 'Save'}
+                          </Button>
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        </Card>
       )}
 
-      <Modal
-        open={!!openFor}
-        onClose={() => setOpenFor(null)}
-        title={editing ? `Edit feedback · ${openFor?.name}` : `Add feedback · ${openFor?.name}`}
-        size="sm"
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setOpenFor(null)}>Cancel</Button>
-            <Button onClick={save} disabled={busy || !subject || !text.trim()}>
-              {busy ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : editing ? 'Save changes' : 'Save feedback'}
-            </Button>
-          </>
-        }
-      >
-        <div className="space-y-4">
-          <label className="block">
-            <span className="lm-label block mb-1.5">Subject</span>
-            <select className="lm-input" value={subject} onChange={(e) => setSubject(e.target.value)}>
-              {subjects.map((sub) => <option key={sub.id} value={sub.name}>{sub.name}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className="lm-label block mb-1.5">Month</span>
-            <select className="lm-input" value={month} onChange={(e) => setMonth(e.target.value)}>
-              {months.map((m) => <option key={m} value={m}>{monthLabel(m)}</option>)}
-            </select>
-          </label>
-          <label className="block">
-            <span className="lm-label block mb-1.5">Your insight for this month</span>
-            <textarea
-              className="lm-input h-28"
-              placeholder="e.g. Doing well with fractions, needs more practice with word problems…"
-              value={text}
-              onChange={(e) => setText(e.target.value)}
-              maxLength={500}
-            />
-            <span className="text-xs text-[var(--ink-soft)] mt-1 block">{text.length}/500</span>
-          </label>
-          {err && <p className="text-sm font-semibold text-[#dc2626] bg-[#fef2f2] rounded-lg px-3 py-2">{err}</p>}
-        </div>
-      </Modal>
+      <Card className="p-5">
+        <h2 className="font-extrabold text-[var(--ink)] mb-4">Full feedback history</h2>
+        {history.length === 0 ? (
+          <EmptyState title="No feedback yet" hint="Once you save feedback above, it'll show up here month by month." />
+        ) : (
+          <div className="overflow-x-auto -mx-5 px-5">
+            <table className="w-full text-sm min-w-[640px]">
+              <thead>
+                <tr className="text-left text-xs font-extrabold uppercase tracking-wide text-[var(--ink-soft)] border-b border-[var(--line)]">
+                  <th className="py-2 pr-3 w-28">Month</th>
+                  <th className="py-2 pr-3 w-28">Subject</th>
+                  <th className="py-2 pr-3">Feedback</th>
+                  <th className="py-2 pr-3 w-32">Teacher</th>
+                  <th className="py-2 pl-3 w-20 text-right">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-[var(--line)]">
+                {history.map((f) => {
+                  const mine = f.teacher_id === teacher?.id;
+                  const isEditing = editingId === f.id;
+                  return (
+                    <tr key={f.id} className="align-top">
+                      <td className="py-3 pr-3 font-bold text-[var(--ink)] whitespace-nowrap">{monthLabelShort(f.month)}</td>
+                      <td className="py-3 pr-3"><Badge tone="focus">{f.subject}</Badge></td>
+                      <td className="py-3 pr-3">
+                        {isEditing ? (
+                          <textarea className="lm-input h-20 text-sm" value={editText} onChange={(e) => setEditText(e.target.value)} maxLength={500} autoFocus />
+                        ) : (
+                          <p className="text-[var(--ink)]">{f.feedback_text}</p>
+                        )}
+                      </td>
+                      <td className="py-3 pr-3 text-[var(--ink-soft)] whitespace-nowrap">{f.teacher?.name ?? 'Teacher'}</td>
+                      <td className="py-3 pl-3 text-right whitespace-nowrap">
+                        {mine && (
+                          isEditing ? (
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={saveHistoryEdit} disabled={historyBusy} className="p-1.5 text-[var(--terracotta)] hover:opacity-70"><Check size={16} /></button>
+                              <button onClick={() => setEditingId(null)} className="p-1.5 text-[var(--ink-soft)] hover:opacity-70"><XIcon size={16} /></button>
+                            </div>
+                          ) : (
+                            <div className="flex items-center justify-end gap-1">
+                              <button onClick={() => startEditHistory(f)} className="p-1.5 text-[var(--ink-soft)] hover:text-[var(--terracotta)]"><Pencil size={14} /></button>
+                              <button onClick={() => setConfirmDelete(f)} className="p-1.5 text-[var(--ink-soft)] hover:text-[#dc2626]"><Trash2 size={14} /></button>
+                            </div>
+                          )
+                        )}
+                      </td>
+                    </tr>
+                  );
+                })}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Card>
 
       <ConfirmDialog
         open={!!confirmDelete}
         onClose={() => setConfirmDelete(null)}
-        onConfirm={doDelete}
+        onConfirm={doDeleteHistory}
         title="Delete feedback?"
         message={confirmDelete ? `Delete your ${confirmDelete.subject} feedback for ${monthLabel(confirmDelete.month)}? This cannot be undone.` : ''}
         confirmLabel="Delete"
