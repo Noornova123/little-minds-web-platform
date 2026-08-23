@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { MessageSquarePlus, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { Card, Spinner, EmptyState } from '@/components/ui';
+import { StudentAvatar } from '@/components/StudentAvatar';
 import { useClassContext } from '@/teacher/useClassContext';
 import { ClassSelector } from '@/teacher/ClassSelector';
 import { navigate } from '@/lib/router';
@@ -43,9 +44,10 @@ export function TeacherFeedback() {
               <button
                 key={s.id}
                 onClick={() => navigate(`/dashboard/feedback/${s.id}`)}
-                className="w-full flex items-center justify-between gap-3 px-3 py-3.5 text-left hover:bg-[var(--cream-deep)] rounded-xl transition-colors"
+                className="w-full flex items-center gap-3 px-3 py-3.5 text-left hover:bg-[var(--cream-deep)] rounded-xl transition-colors"
               >
-                <div className="min-w-0">
+                <StudentAvatar id={s.id} name={s.name} photoUrl={s.photo_url} size="md" />
+                <div className="min-w-0 flex-1">
                   <p className="font-bold text-[var(--ink)]">{s.roll_number}. {s.name}</p>
                   <p className="text-xs text-[var(--ink-soft)] mt-0.5">
                     {countsLoading ? 'Loading…' : `${counts[s.id] ?? 0} feedback entr${(counts[s.id] ?? 0) === 1 ? 'y' : 'ies'}`}
