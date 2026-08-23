@@ -61,6 +61,7 @@ export interface Student {
   class_id: string;
   name: string;
   roll_number: string;
+  photo_url: string | null;
   created_at: string;
 }
 
