@@ -4,6 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { navigate } from '@/lib/router';
 import type { AttendanceRow } from '@/lib/types';
 import { Card, Button, Spinner, EmptyState } from '@/components/ui';
+import { StudentAvatar } from '@/components/StudentAvatar';
 import { useClassContext } from '@/teacher/useClassContext';
 import { ClassSelector } from '@/teacher/ClassSelector';
 
@@ -92,7 +93,7 @@ export function Attendance() {
               const status = records[s.id] ?? 'present';
               return (
                 <div key={s.id} className="flex items-center gap-3 px-3 py-2.5 rounded-xl border border-[var(--line)]">
-                  <div className="w-8 h-8 rounded-full bg-[var(--cream-deep)] flex items-center justify-center text-xs font-extrabold text-[var(--ink-soft)] shrink-0">{s.roll_number}</div>
+                  <StudentAvatar id={s.id} name={s.name} photoUrl={s.photo_url} size="sm" />
                   <span className="font-bold text-[var(--ink)] text-sm flex-1 truncate">{s.name}</span>
                   <div className="flex gap-1.5">
                     <button
