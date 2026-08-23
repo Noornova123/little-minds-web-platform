@@ -5,6 +5,7 @@ import { useAuth } from '@/lib/auth';
 import { navigate } from '@/lib/router';
 import type { AcademicSubject, Student, ClassRow, TeacherFeedback as Feedback } from '@/lib/types';
 import { Card, Button, Spinner, EmptyState, Badge } from '@/components/ui';
+import { StudentAvatar } from '@/components/StudentAvatar';
 import { ConfirmDialog } from '@/components/Modal';
 
 function currentMonth() {
@@ -145,9 +146,19 @@ export function TeacherFeedbackForm({ studentId }: { studentId: string }) {
       </button>
 
       <Card className="p-5 flex items-center justify-between flex-wrap gap-3">
-        <div>
-          <h1 className="text-2xl font-extrabold text-[var(--ink)]" style={{ fontFamily: 'Fraunces, serif' }}>{student.name}</h1>
-          <p className="text-sm text-[var(--ink-soft)] mt-0.5">Roll no. {student.roll_number}{classRow ? ` · ${classRow.name}` : ''} · {feedback.length} feedback entr{feedback.length === 1 ? 'y' : 'ies'} total</p>
+        <div className="flex items-center gap-4 min-w-0">
+          <StudentAvatar
+            id={student.id}
+            name={student.name}
+            photoUrl={student.photo_url}
+            size="lg"
+            editable
+            onPhotoChange={(url) => setStudent((p) => p ? { ...p, photo_url: url } : p)}
+          />
+          <div className="min-w-0">
+            <h1 className="text-2xl font-extrabold text-[var(--ink)] truncate" style={{ fontFamily: 'Fraunces, serif' }}>{student.name}</h1>
+            <p className="text-sm text-[var(--ink-soft)] mt-0.5">Roll no. {student.roll_number}{classRow ? ` · ${classRow.name}` : ''} · {feedback.length} feedback entr{feedback.length === 1 ? 'y' : 'ies'} total</p>
+          </div>
         </div>
         <Badge tone="focus"><MessageSquareText size={12} className="inline mr-1" />Subject feedback</Badge>
       </Card>
