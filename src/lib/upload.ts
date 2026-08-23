@@ -48,6 +48,35 @@ export async function uploadImage(file: File, folder: ImageFolder): Promise<Uplo
 }
 
 /**
+ * Upload a student's profile photo. Teachers can only upload for students
+ * in their own school (enforced by storage RLS, not just this helper).
+ */
+export async function uploadStudentPhoto(file: File, studentId: string): Promise<UploadResult> {
+  if (!ACCEPTED.includes(file.type)) {
+    throw new UploadError('Unsupported format. Use JPG, PNG, WebP, or GIF.');
+  }
+  if (file.size > MAX_SIZE) {
+    throw new UploadError('File too large. Maximum size is 5MB.');
+  }
+
+  const ext = file.name.split('.').pop()?.toLowerCase() || 'jpg';
+  const fileName = `${crypto.randomUUID()}.${ext}`;
+  const path = `student-photos/${studentId}/${fileName}`;
+
+  const { error } = await supabase.storage.from('content-images').upload(path, file, {
+    contentType: file.type,
+    upsert: false,
+  });
+
+  if (error) {
+    throw new UploadError(error.message || 'Upload failed. Please try again.');
+  }
+
+  const { data } = supabase.storage.from('content-images').getPublicUrl(path);
+  return { url: data.publicUrl, path };
+}
+
+/**
  * Remove an image from storage by its public path.
  * Best-effort: fails silently if the file was an external URL.
  */
