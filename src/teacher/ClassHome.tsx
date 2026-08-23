@@ -1,11 +1,12 @@
 import { useEffect, useState } from 'react';
-import { CalendarCheck, Play, FileText, Flame, Users, Lock, Library, Sparkles, AlertCircle } from 'lucide-react';
+import { CalendarCheck, Play, FileText, Flame, Users, Lock, Library, Sparkles, AlertCircle, ChevronRight } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { navigate } from '@/lib/router';
-import type { Activity, AttendanceRow, Banner, ChecklistResponse } from '@/lib/types';
+import type { Activity, AttendanceRow, Banner, ChecklistResponse, Student } from '@/lib/types';
 import { matchesGrade } from '@/lib/types';
 import { Card, Button, Spinner, EmptyState, Badge } from '@/components/ui';
 import { Modal } from '@/components/Modal';
+import { StudentAvatar } from '@/components/StudentAvatar';
 import { useClassContext } from '@/teacher/useClassContext';
 import { ClassSelector } from '@/teacher/ClassSelector';
 import { BannerCarousel } from '@/teacher/BannerCarousel';
@@ -13,7 +14,7 @@ import { QuickNoteButton } from '@/teacher/QuickNote';
 import { useAuth } from '@/lib/auth';
 
 export function ClassHome() {
-  const { school, classes, selectedClass, students, progress, loading, selectClass } = useClassContext();
+  const { school, classes, selectedClass, students, progress, loading, selectClass, refresh } = useClassContext();
   const { teacher } = useAuth();
   const [todayActivity, setTodayActivity] = useState<Activity | null>(null);
   const [attendanceToday, setAttendanceToday] = useState<AttendanceRow[]>([]);
@@ -22,6 +23,7 @@ export function ClassHome() {
   const [banners, setBanners] = useState<Banner[]>([]);
   const [welcomeOpen, setWelcomeOpen] = useState(false);
   const [checklistDue, setChecklistDue] = useState(false);
+  const [photoOverrides, setPhotoOverrides] = useState<Record<string, string>>({});
 
   const today = new Date().toISOString().slice(0, 10);
   const currentDay = progress?.current_day ?? 0;
@@ -186,19 +188,44 @@ export function ClassHome() {
       )}
 
       {/* Roster */}
-      <Card className="p-5">
-        <h3 className="font-extrabold text-[var(--ink)] mb-3">Roster · {students.length} students</h3>
+      <Card className="p-5 sm:p-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="font-extrabold text-[var(--ink)] text-lg" style={{ fontFamily: 'Fraunces, serif' }}>Your class</h3>
+            <p className="text-xs text-[var(--ink-soft)] mt-0.5">{students.length} student{students.length === 1 ? '' : 's'} · tap a photo to add one</p>
+          </div>
+        </div>
         {students.length === 0 ? (
-          <EmptyState title="No students in this class" hint="Your admin can bulk-upload students from the school detail page." />
+          <EmptyState title="No students in this class" hint="Your admin can add students from the school detail page." />
         ) : (
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-3">
             {students.map((s) => (
-              <div key={s.id} className="flex items-center gap-2 px-3 py-2.5 rounded-2xl hover:bg-[var(--cream-deep)] transition-colors">
-                <button onClick={() => navigate(`/dashboard/reports/${s.id}`)} className="flex items-center gap-3 flex-1 min-w-0 text-left">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-br from-[var(--sunny-soft)] to-[var(--coral-soft)] flex items-center justify-center text-xs font-extrabold text-[var(--ink-soft)]">{s.roll_number}</div>
-                  <span className="font-bold text-[var(--ink)] text-sm flex-1 truncate">{s.name}</span>
-                </button>
-                <QuickNoteButton studentId={s.id} studentName={s.name} />
+              <div
+                key={s.id}
+                className="relative group rounded-3xl p-4 flex flex-col items-center text-center transition-all hover:-translate-y-0.5"
+                style={{ background: 'linear-gradient(155deg, var(--cream-deep), #fff)', border: '1px solid var(--line)' }}
+              >
+                <button onClick={() => navigate(`/dashboard/reports/${s.id}`)} className="absolute inset-0 rounded-3xl" aria-label={`View ${s.name}'s report`} />
+                <div className="relative z-10 pointer-events-none">
+                  <div className="pointer-events-auto">
+                    <StudentAvatar
+                      id={s.id}
+                      name={s.name}
+                      photoUrl={photoOverrides[s.id] ?? s.photo_url}
+                      size="xl"
+                      editable
+                      onPhotoChange={(url) => setPhotoOverrides((p) => ({ ...p, [s.id]: url }))}
+                    />
+                  </div>
+                </div>
+                <p className="relative z-10 font-extrabold text-[var(--ink)] text-sm mt-3 line-clamp-1 pointer-events-none">{s.name}</p>
+                <p className="relative z-10 text-[11px] font-bold text-[var(--ink-soft)] pointer-events-none">Roll {s.roll_number}</p>
+                <div className="relative z-10 flex items-center gap-1 mt-2 pointer-events-auto">
+                  <QuickNoteButton studentId={s.id} studentName={s.name} />
+                  <button onClick={() => navigate(`/dashboard/reports/${s.id}`)} className="p-1.5 rounded-full text-[var(--ink-soft)] hover:bg-white hover:text-[var(--terracotta)] transition-colors" aria-label={`View ${s.name}'s report`}>
+                    <ChevronRight size={14} />
+                  </button>
+                </div>
               </div>
             ))}
           </div>
