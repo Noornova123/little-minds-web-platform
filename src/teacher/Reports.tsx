@@ -5,6 +5,7 @@ import { navigate } from '@/lib/router';
 import type { Activity, AttendanceRow, DailyCheckpoint, MonthlyCheck, Student, LibraryCompletion, ChecklistStatement, ChecklistResponse, ChecklistDomainRow, AnecdotalNote, ExamMark, Achievement, TeacherFeedback } from '@/lib/types';
 import { renderDomainIcon } from '@/lib/domainIcons';
 import { Card, Spinner, EmptyState, Badge } from '@/components/ui';
+import { StudentAvatar } from '@/components/StudentAvatar';
 import { LineChart, BarChart } from '@/components/Charts';
 import { useClassContext } from '@/teacher/useClassContext';
 import { ClassSelector } from '@/teacher/ClassSelector';
@@ -152,7 +153,7 @@ export function ClassReport() {
               });
               return (
                 <button key={s.id} onClick={() => navigate(`/dashboard/reports/${s.id}`)} className="w-full flex items-center gap-3 py-3 text-left hover:bg-[var(--cream-deep)] -mx-2 px-2 rounded-xl transition-colors">
-                  <div className="w-9 h-9 rounded-full bg-[var(--cream-deep)] flex items-center justify-center text-xs font-extrabold text-[var(--ink-soft)] shrink-0">{s.roll_number}</div>
+                  <StudentAvatar id={s.id} name={s.name} photoUrl={s.photo_url} size="md" />
                   <div className="flex-1 min-w-0">
                     <p className="font-bold text-[var(--ink)] truncate">{s.name}</p>
                     <p className="text-xs text-[var(--ink-soft)]">
@@ -335,12 +336,15 @@ export function StudentReport({ studentId }: { studentId: string }) {
       <Card className="p-6 sm:p-8 print-page">
         {/* Header */}
         <div className="flex items-start justify-between mb-6 pb-6 border-b border-[var(--line)] flex-wrap gap-3">
-          <div className="min-w-0 flex-1">
-            <div className="flex items-center gap-3 flex-wrap">
-              <h1 className="text-xl sm:text-2xl font-extrabold text-[var(--ink)]" style={{ fontFamily: 'Fraunces, serif' }}>{student.name}</h1>
-              <QuickNoteButton studentId={student.id} studentName={student.name} />
+          <div className="min-w-0 flex-1 flex items-center gap-4">
+            <StudentAvatar id={student.id} name={student.name} photoUrl={student.photo_url} size="lg" editable onPhotoChange={(url) => setStudent((p) => p ? { ...p, photo_url: url } : p)} className="no-print" />
+            <div className="min-w-0 flex-1">
+              <div className="flex items-center gap-3 flex-wrap">
+                <h1 className="text-xl sm:text-2xl font-extrabold text-[var(--ink)]" style={{ fontFamily: 'Fraunces, serif' }}>{student.name}</h1>
+                <QuickNoteButton studentId={student.id} studentName={student.name} />
+              </div>
+              <p className="text-sm text-[var(--ink-soft)] mt-1">Roll no. {student.roll_number} · {selectedClass?.name} · {school?.name}</p>
             </div>
-            <p className="text-sm text-[var(--ink-soft)] mt-1">Roll no. {student.roll_number} · {selectedClass?.name} · {school?.name}</p>
           </div>
           <div className="text-right shrink-0">
             <div className="flex items-center gap-1.5 text-[var(--terracotta)] font-extrabold text-sm justify-end">
