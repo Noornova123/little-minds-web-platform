@@ -83,7 +83,7 @@ export function TeacherLayout({ children }: { children: React.ReactNode }) {
           </div>
 
           <div className="flex items-center gap-2.5">
-            <div className="w-9 h-9 rounded-xl bg-[var(--terracotta)] flex items-center justify-center text-white lm-wiggle">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-[var(--sunny)] to-[var(--coral)] flex items-center justify-center text-white lm-wiggle" style={{ boxShadow: '0 4px 12px rgba(238, 138, 107, 0.35)' }}>
               <Brain size={20} />
             </div>
             <div className="hidden sm:block leading-tight">
@@ -106,10 +106,33 @@ export function TeacherLayout({ children }: { children: React.ReactNode }) {
         </div>
       </header>
 
-      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6">
+      <main className="flex-1 max-w-5xl mx-auto w-full px-4 sm:px-6 py-6 pb-24 sm:pb-6">
         {children}
       </main>
+
+      {/* Colorful bottom tab bar (mobile-first, always visible) */}
+      <nav className="fixed bottom-0 inset-x-0 z-30 sm:hidden">
+        <div className="mx-3 mb-3 rounded-[1.75rem] bg-[var(--ink)] px-2 py-2 flex items-center justify-between shadow-[0_10px_30px_rgba(0,0,0,0.25)]">
+          <TabItem icon={<Home size={20} />} active={onHome} onClick={() => navigate('/dashboard')} tone="var(--terracotta)" />
+          <TabItem icon={<Library size={20} />} active={onLibrary} onClick={() => navigate('/dashboard/library')} tone="var(--sky)" />
+          <TabItem icon={<MessageSquarePlus size={20} />} active={onFeedback} onClick={() => navigate('/dashboard/feedback')} tone="var(--sunny)" />
+          <TabItem icon={<FileText size={20} />} active={onReports} onClick={() => navigate('/dashboard/reports')} tone="var(--sage)" />
+          <TabItem icon={<User size={20} />} active={onProfile} onClick={() => navigate('/dashboard/profile')} tone="var(--coral)" />
+        </div>
+      </nav>
     </div>
+  );
+}
+
+function TabItem({ icon, active, onClick, tone }: { icon: React.ReactNode; active?: boolean; onClick: () => void; tone: string }) {
+  return (
+    <button
+      onClick={onClick}
+      className="relative flex-1 flex items-center justify-center py-2.5 rounded-2xl transition-all"
+      style={{ background: active ? tone : 'transparent', color: active ? '#fff' : 'rgba(255,255,255,0.55)', boxShadow: active ? `0 4px 14px ${tone}66` : 'none', transform: active ? 'translateY(-2px) scale(1.05)' : 'none' }}
+    >
+      {icon}
+    </button>
   );
 }
 
