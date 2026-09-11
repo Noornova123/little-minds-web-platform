@@ -332,6 +332,7 @@ export interface DiagnosticAttempt {
   student_id: string;
   subject_id: string;
   grade_level: string;
+  board: string;
   status: DiagnosticAttemptStatus;
   started_at: string;
   completed_at: string | null;
