@@ -291,10 +291,18 @@ export interface DiagnosticSubject {
   created_at: string;
 }
 
+export interface EducationBoard {
+  id: string;
+  name: string;
+  sort_order: number;
+  created_at: string;
+}
+
 export interface DiagnosticTopic {
   id: string;
   subject_id: string;
   grade_level: string;
+  board: string;
   name: string;
   display_order: number;
   created_at: string;
