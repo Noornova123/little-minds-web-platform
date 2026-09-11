@@ -15,6 +15,10 @@ import { AdminBanners } from '@/admin/AdminBanners';
 import { AdminChecklistStatements } from '@/admin/AdminChecklistStatements';
 import { AdminAcademicMarks } from '@/admin/AdminAcademicMarks';
 import { AdminBootstrap } from '@/admin/AdminBootstrap';
+import { AdminDiagnostics } from '@/admin/AdminDiagnostics';
+import { AdminDiagnosticTopics } from '@/admin/AdminDiagnosticTopics';
+import { AdminDiagnosticSkills } from '@/admin/AdminDiagnosticSkills';
+import { AdminDiagnosticQuestions } from '@/admin/AdminDiagnosticQuestions';
 
 export function AdminApp() {
   const path = useHashRoute();
@@ -28,6 +32,10 @@ export function AdminApp() {
   if (path === '/admin/bootstrap') {
     return <AdminBootstrap />;
   }
+
+  const diagnosticSubjectMatch = matchPath('/admin/diagnostics/subjects/:subjectId', path);
+  const diagnosticTopicMatch = matchPath('/admin/diagnostics/topics/:topicId', path);
+  const diagnosticSkillMatch = matchPath('/admin/diagnostics/skills/:skillId', path);
 
   return (
     <AdminGate>
@@ -45,6 +53,10 @@ export function AdminApp() {
           path.startsWith('/admin/banners') ? <AdminBanners /> :
           path.startsWith('/admin/checklist-statements') ? <AdminChecklistStatements /> :
           path.startsWith('/admin/academic-marks') ? <AdminAcademicMarks /> :
+          diagnosticSkillMatch ? <AdminDiagnosticQuestions skillId={diagnosticSkillMatch.skillId} /> :
+          diagnosticTopicMatch ? <AdminDiagnosticSkills topicId={diagnosticTopicMatch.topicId} /> :
+          diagnosticSubjectMatch ? <AdminDiagnosticTopics subjectId={diagnosticSubjectMatch.subjectId} /> :
+          path.startsWith('/admin/diagnostics') ? <AdminDiagnostics /> :
           <NotFound onHome={() => navigate('/admin')} />}
       </AdminLayout>
     </AdminGate>
