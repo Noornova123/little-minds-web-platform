@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from 'react';
-import { LayoutDashboard, Building2, BookOpen, Tags, GraduationCap, Users, CreditCard, Megaphone, LifeBuoy, ImagePlus, ListChecks, ClipboardList, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Building2, BookOpen, Tags, GraduationCap, Users, CreditCard, Megaphone, LifeBuoy, ImagePlus, ListChecks, ClipboardList, Stethoscope, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useHashRoute, navigate, matchPath } from '@/lib/router';
 
@@ -15,6 +15,7 @@ const navItems = [
   { label: 'Banners', path: '/admin/banners', icon: ImagePlus },
   { label: 'Checklist Statements', path: '/admin/checklist-statements', icon: ListChecks },
   { label: 'Academic Marks', path: '/admin/academic-marks', icon: ClipboardList },
+  { label: 'Diagnostics', path: '/admin/diagnostics', icon: Stethoscope },
   { label: 'Help Content', path: '/admin/help', icon: LifeBuoy },
 ];
 
@@ -35,6 +36,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const onBanners = path.startsWith('/admin/banners');
   const onChecklist = path.startsWith('/admin/checklist-statements');
   const onAcademicMarks = path.startsWith('/admin/academic-marks');
+  const onDiagnostics = path.startsWith('/admin/diagnostics');
   const onHelp = path.startsWith('/admin/help');
 
   function handleSignOut() {
@@ -91,7 +93,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </button>
           <div className="flex-1">
             <h2 className="font-extrabold text-[var(--ink)] text-lg leading-tight" style={{ fontFamily: 'Fraunces, serif' }}>
-              {onSchoolDetail ? 'School Detail' : onCategories ? 'Categories' : onGrades ? 'Grade Levels' : onTeachers ? 'Teachers' : onBilling ? 'Billing' : onAnnouncements ? 'Announcements' : onBanners ? 'Banners' : onChecklist ? 'Checklist Statements' : onAcademicMarks ? 'Academic Marks' : onHelp ? 'Help Content' : navItems.find((i) => isActive(i))?.label ?? 'Admin'}
+              {onSchoolDetail ? 'School Detail' : onCategories ? 'Categories' : onGrades ? 'Grade Levels' : onTeachers ? 'Teachers' : onBilling ? 'Billing' : onAnnouncements ? 'Announcements' : onBanners ? 'Banners' : onChecklist ? 'Checklist Statements' : onAcademicMarks ? 'Academic Marks' : onDiagnostics ? 'Diagnostics' : onHelp ? 'Help Content' : navItems.find((i) => isActive(i))?.label ?? 'Admin'}
             </h2>
           </div>
         </header>
