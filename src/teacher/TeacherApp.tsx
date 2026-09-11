@@ -14,9 +14,17 @@ import { TeacherCalendar } from '@/teacher/TeacherCalendar';
 import { TeacherHelp } from '@/teacher/TeacherHelp';
 import { TeacherFeedback } from '@/teacher/TeacherFeedback';
 import { TeacherFeedbackForm } from '@/teacher/TeacherFeedbackForm';
+import { Diagnostics } from '@/teacher/Diagnostics';
+import { DiagnosticStudentHome } from '@/teacher/DiagnosticStudentHome';
+import { DiagnosticRun } from '@/teacher/DiagnosticRun';
+import { DiagnosticReport } from '@/teacher/DiagnosticReport';
 
 export function TeacherApp() {
   const path = useHashRoute();
+
+  const diagnosticRunMatch = matchPath('/dashboard/diagnostics/:studentId/run/:attemptId', path);
+  const diagnosticReportMatch = matchPath('/dashboard/diagnostics/:studentId/report/:attemptId', path);
+  const diagnosticStudentMatch = matchPath('/dashboard/diagnostics/:studentId', path);
 
   return (
     <TeacherGate>
@@ -35,6 +43,10 @@ export function TeacherApp() {
           path.startsWith('/dashboard/profile') ? <TeacherProfile /> :
           path.startsWith('/dashboard/calendar') ? <TeacherCalendar /> :
           path.startsWith('/dashboard/help') ? <TeacherHelp /> :
+          diagnosticRunMatch ? <DiagnosticRun studentId={diagnosticRunMatch.studentId} attemptId={diagnosticRunMatch.attemptId} /> :
+          diagnosticReportMatch ? <DiagnosticReport studentId={diagnosticReportMatch.studentId} attemptId={diagnosticReportMatch.attemptId} /> :
+          diagnosticStudentMatch ? <DiagnosticStudentHome studentId={diagnosticStudentMatch.studentId} /> :
+          path.startsWith('/dashboard/diagnostics') ? <Diagnostics /> :
           <NotFound onHome={() => navigate('/dashboard')} />}
       </TeacherLayout>
     </TeacherGate>
