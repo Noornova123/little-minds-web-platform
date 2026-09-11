@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { ArrowLeft, Plus, Pencil, Trash2, ArrowUp, ArrowDown, Loader2, ChevronRight, Layers } from 'lucide-react';
 import { supabase } from '@/lib/supabase';
 import { navigate } from '@/lib/router';
-import type { DiagnosticSubject, DiagnosticTopic, GradeLevel } from '@/lib/types';
+import type { DiagnosticSubject, DiagnosticTopic, GradeLevel, EducationBoard } from '@/lib/types';
 import { Card, Button, Input, Spinner, EmptyState, Badge } from '@/components/ui';
 import { Modal, ConfirmDialog } from '@/components/Modal';
 
@@ -10,6 +10,7 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
   const [subject, setSubject] = useState<DiagnosticSubject | null>(null);
   const [topics, setTopics] = useState<DiagnosticTopic[]>([]);
   const [grades, setGrades] = useState<GradeLevel[]>([]);
+  const [boards, setBoards] = useState<EducationBoard[]>([]);
   const [skillCounts, setSkillCounts] = useState<Record<string, number>>({});
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
@@ -18,16 +19,18 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
   const [editing, setEditing] = useState<DiagnosticTopic | null>(null);
   const [name, setName] = useState('');
   const [gradeLevel, setGradeLevel] = useState('');
+  const [board, setBoard] = useState('');
   const [busy, setBusy] = useState(false);
   const [formErr, setFormErr] = useState<string | null>(null);
   const [confirmDelete, setConfirmDelete] = useState<DiagnosticTopic | null>(null);
 
   async function load() {
     setLoading(true); setErr(null);
-    const [subRes, topicRes, gradeRes] = await Promise.all([
+    const [subRes, topicRes, gradeRes, boardRes] = await Promise.all([
       supabase.from('diagnostic_subjects').select('*').eq('id', subjectId).maybeSingle(),
       supabase.from('diagnostic_topics').select('*').eq('subject_id', subjectId).order('display_order', { ascending: true }),
       supabase.from('grade_levels').select('*').order('sort_order', { ascending: true }),
+      supabase.from('education_boards').select('*').order('sort_order', { ascending: true }),
     ]);
     if (subRes.error) { setErr(subRes.error.message); setLoading(false); return; }
     if (topicRes.error) { setErr(topicRes.error.message); setLoading(false); return; }
@@ -35,6 +38,7 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
     const topicRows = (topicRes.data as DiagnosticTopic[]) ?? [];
     setTopics(topicRows);
     setGrades((gradeRes.data as GradeLevel[]) ?? []);
+    setBoards((boardRes.data as EducationBoard[]) ?? []);
 
     if (topicRows.length > 0) {
       const { data: skillRows } = await supabase
@@ -56,6 +60,7 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
     setEditing(null);
     setName('');
     setGradeLevel(grades[0]?.name ?? '');
+    setBoard(boards[0]?.name ?? '');
     setFormErr(null);
     setShowForm(true);
   }
@@ -64,6 +69,7 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
     setEditing(t);
     setName(t.name);
     setGradeLevel(t.grade_level);
+    setBoard(t.board);
     setFormErr(null);
     setShowForm(true);
   }
@@ -72,14 +78,15 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
     e?.preventDefault();
     if (!name.trim()) { setFormErr('Topic name is required.'); return; }
     if (!gradeLevel) { setFormErr('Please select a grade level.'); return; }
+    if (!board) { setFormErr('Please select a board.'); return; }
     setBusy(true); setFormErr(null);
     if (editing) {
-      const { error } = await supabase.from('diagnostic_topics').update({ name: name.trim(), grade_level: gradeLevel }).eq('id', editing.id);
+      const { error } = await supabase.from('diagnostic_topics').update({ name: name.trim(), grade_level: gradeLevel, board }).eq('id', editing.id);
       setBusy(false);
       if (error) { setFormErr(error.message); return; }
     } else {
       const nextOrder = topics.length > 0 ? Math.max(...topics.map((t) => t.display_order)) + 1 : 1;
-      const { error } = await supabase.from('diagnostic_topics').insert({ subject_id: subjectId, name: name.trim(), grade_level: gradeLevel, display_order: nextOrder }).select();
+      const { error } = await supabase.from('diagnostic_topics').insert({ subject_id: subjectId, name: name.trim(), grade_level: gradeLevel, board, display_order: nextOrder }).select();
       setBusy(false);
       if (error) { setFormErr(error.message); return; }
     }
@@ -120,16 +127,17 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
             {subject?.name ?? 'Topics'}
           </h1>
         </div>
-        <Button size="sm" onClick={openNew} disabled={grades.length === 0}><Plus size={16} /> Add Topic</Button>
+        <Button size="sm" onClick={openNew} disabled={grades.length === 0 || boards.length === 0}><Plus size={16} /> Add Topic</Button>
       </div>
 
       <p className="text-sm text-[var(--ink-soft)]">
-        Topics are chapters within {subject?.name ?? 'this subject'}, tagged to a class/grade level. Open a topic to add the skills it covers.
+        Topics are chapters within {subject?.name ?? 'this subject'}, tagged to a class/grade level AND a board (since the same grade's syllabus differs by board). Open a topic to add the skills it covers.
       </p>
 
-      {grades.length === 0 && (
+      {(grades.length === 0 || boards.length === 0) && (
         <p className="text-sm font-semibold text-[#92400e] bg-[#fffbeb] rounded-lg px-3 py-2">
-          No grade levels found — add them first under Admin → Grade Levels.
+          {grades.length === 0 && 'No grade levels found — add them under Admin → Grade Levels. '}
+          {boards.length === 0 && 'No boards found — add them under Admin → Boards.'}
         </p>
       )}
 
@@ -137,7 +145,7 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
 
       {loading ? <Spinner label="Loading topics…" /> : topics.length === 0 ? (
         <Card className="p-5">
-          <EmptyState title="No topics yet" hint="Add a topic like 'Fractions' and tag it to a grade level." />
+          <EmptyState title="No topics yet" hint="Add a topic like 'Fractions' and tag it to a grade level and board." />
         </Card>
       ) : (
         <div className="space-y-2">
@@ -150,6 +158,7 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
               <button className="flex-1 text-left flex items-center gap-2 flex-wrap" onClick={() => navigate(`/admin/diagnostics/topics/${t.id}`)}>
                 <span className="font-extrabold text-[var(--ink)]">{t.name}</span>
                 <Badge tone="neutral">{t.grade_level}</Badge>
+                <Badge tone="neutral">{t.board}</Badge>
                 <Badge tone="neutral">{skillCounts[t.id] ?? 0} skills</Badge>
               </button>
               <button onClick={() => openEdit(t)} className="p-2 rounded-lg text-[var(--ink-soft)] hover:bg-[var(--cream-deep)] hover:text-[var(--terracotta)]"><Pencil size={14} /></button>
@@ -177,6 +186,12 @@ export function AdminDiagnosticTopics({ subjectId }: { subjectId: string }) {
             <span className="lm-label block mb-1.5">Grade level</span>
             <select className="lm-input" value={gradeLevel} onChange={(e) => setGradeLevel(e.target.value)}>
               {grades.map((g) => <option key={g.id} value={g.name}>{g.name}</option>)}
+            </select>
+          </label>
+          <label className="block">
+            <span className="lm-label block mb-1.5">Board</span>
+            <select className="lm-input" value={board} onChange={(e) => setBoard(e.target.value)}>
+              {boards.map((b) => <option key={b.id} value={b.name}>{b.name}</option>)}
             </select>
           </label>
           {formErr && <p className="text-sm font-semibold text-[#dc2626] bg-[#fef2f2] rounded-lg px-3 py-2">{formErr}</p>}
