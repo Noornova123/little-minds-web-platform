@@ -4,7 +4,7 @@ import { supabase } from '@/lib/supabase';
 import { navigate } from '@/lib/router';
 import type { DiagnosticSkill, DiagnosticQuestion, DiagnosticQuestionType, DiagnosticDifficulty } from '@/lib/types';
 import { Card, Button, Input, Spinner, EmptyState, Badge } from '@/components/ui';
-import { Modal, ConfirmDialog } from '@/components/Modal';
+import { ConfirmDialog } from '@/components/Modal';
 
 const DIFFICULTY_COLOR: Record<DiagnosticDifficulty, string> = {
   easy: '#059669',
@@ -18,8 +18,10 @@ export function AdminDiagnosticQuestions({ skillId }: { skillId: string }) {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState<string | null>(null);
 
-  const [showForm, setShowForm] = useState(false);
-  const [editing, setEditing] = useState<DiagnosticQuestion | null>(null);
+  // When null → showing the list. When set → showing the full-page form
+  // (either a fresh blank question, or the question being edited).
+  const [formMode, setFormMode] = useState<'new' | DiagnosticQuestion | null>(null);
+
   const [questionText, setQuestionText] = useState('');
   const [questionType, setQuestionType] = useState<DiagnosticQuestionType>('mcq');
   const [options, setOptions] = useState<string[]>(['', '']);
@@ -45,25 +47,27 @@ export function AdminDiagnosticQuestions({ skillId }: { skillId: string }) {
   useEffect(() => { load(); }, [skillId]);
 
   function openNew() {
-    setEditing(null);
     setQuestionText('');
     setQuestionType('mcq');
     setOptions(['', '']);
     setCorrectAnswer('');
     setDifficulty('medium');
     setFormErr(null);
-    setShowForm(true);
+    setFormMode('new');
   }
 
   function openEdit(q: DiagnosticQuestion) {
-    setEditing(q);
     setQuestionText(q.question_text);
     setQuestionType(q.question_type);
     setOptions(q.options.length > 0 ? q.options : ['', '']);
     setCorrectAnswer(q.correct_answer);
     setDifficulty(q.difficulty);
     setFormErr(null);
-    setShowForm(true);
+    setFormMode(q);
+  }
+
+  function closeForm() {
+    setFormMode(null);
   }
 
   function updateOption(idx: number, value: string) {
@@ -93,8 +97,8 @@ export function AdminDiagnosticQuestions({ skillId }: { skillId: string }) {
       correct_answer: correctAnswer.trim(),
       difficulty,
     };
-    if (editing) {
-      const { error } = await supabase.from('diagnostic_questions').update(payload).eq('id', editing.id);
+    if (formMode && formMode !== 'new') {
+      const { error } = await supabase.from('diagnostic_questions').update(payload).eq('id', formMode.id);
       setBusy(false);
       if (error) { setFormErr(error.message); return; }
     } else {
@@ -102,7 +106,7 @@ export function AdminDiagnosticQuestions({ skillId }: { skillId: string }) {
       setBusy(false);
       if (error) { setFormErr(error.message); return; }
     }
-    setShowForm(false);
+    setFormMode(null);
     await load();
   }
 
@@ -113,6 +117,110 @@ export function AdminDiagnosticQuestions({ skillId }: { skillId: string }) {
     load();
   }
 
+  // ──────────────── FULL-PAGE FORM VIEW ────────────────
+  if (formMode) {
+    const isEditing = formMode !== 'new';
+    return (
+      <div className="space-y-5 lm-fade-up">
+        <button onClick={closeForm} className="flex items-center gap-1.5 text-sm font-bold text-[var(--ink-soft)] hover:text-[var(--ink)]">
+          <ArrowLeft size={15} /> Back to questions
+        </button>
+
+        <div className="flex items-center gap-2">
+          <HelpCircle size={20} className="text-[var(--terracotta)]" />
+          <h1 className="text-2xl font-extrabold text-[var(--ink)]" style={{ fontFamily: 'Fraunces, serif' }}>
+            {isEditing ? 'Edit question' : 'Add question'}
+          </h1>
+        </div>
+
+        <Card className="p-6 max-w-2xl">
+          <form onSubmit={save} className="space-y-5">
+            <Input label="Question text" value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="e.g. What is 1/2 + 1/4?" autoFocus />
+
+            <label className="block">
+              <span className="lm-label block mb-1.5">Question type</span>
+              <select
+                className="lm-input"
+                value={questionType}
+                onChange={(e) => {
+                  const val = e.target.value as DiagnosticQuestionType;
+                  setQuestionType(val);
+                  setCorrectAnswer('');
+                  if (val === 'true_false') setOptions(['True', 'False']);
+                  else if (val === 'mcq') setOptions(['', '']);
+                }}
+              >
+                <option value="mcq">Multiple choice</option>
+                <option value="true_false">True / False</option>
+                <option value="short_answer">Short answer</option>
+              </select>
+            </label>
+
+            {questionType === 'mcq' && (
+              <div>
+                <span className="lm-label block mb-1.5">Options</span>
+                <div className="space-y-2">
+                  {options.map((o, i) => (
+                    <div key={i} className="flex items-center gap-2">
+                      <input
+                        className="lm-input flex-1"
+                        value={o}
+                        onChange={(e) => updateOption(i, e.target.value)}
+                        placeholder={`Option ${i + 1}`}
+                      />
+                      {options.length > 2 && (
+                        <button type="button" onClick={() => removeOption(i)} className="p-1.5 text-[var(--ink-soft)] hover:text-[#dc2626]"><X size={16} /></button>
+                      )}
+                    </div>
+                  ))}
+                </div>
+                <button type="button" onClick={addOption} className="mt-2 text-sm font-bold text-[var(--terracotta)] hover:underline">+ Add option</button>
+              </div>
+            )}
+
+            {questionType === 'true_false' ? (
+              <label className="block">
+                <span className="lm-label block mb-1.5">Correct answer</span>
+                <select className="lm-input" value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)}>
+                  <option value="">Select…</option>
+                  <option value="True">True</option>
+                  <option value="False">False</option>
+                </select>
+              </label>
+            ) : questionType === 'mcq' ? (
+              <label className="block">
+                <span className="lm-label block mb-1.5">Correct answer</span>
+                <select className="lm-input" value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)}>
+                  <option value="">Select the correct option…</option>
+                  {options.filter((o) => o.trim()).map((o, i) => <option key={i} value={o}>{o}</option>)}
+                </select>
+              </label>
+            ) : (
+              <Input label="Correct answer" value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} placeholder="Expected answer" />
+            )}
+
+            <label className="block">
+              <span className="lm-label block mb-1.5">Difficulty</span>
+              <select className="lm-input" value={difficulty} onChange={(e) => setDifficulty(e.target.value as DiagnosticDifficulty)}>
+                <option value="easy">Easy</option>
+                <option value="medium">Medium</option>
+                <option value="hard">Hard</option>
+              </select>
+            </label>
+
+            {formErr && <p className="text-sm font-semibold text-[#dc2626] bg-[#fef2f2] rounded-lg px-3 py-2">{formErr}</p>}
+
+            <div className="flex items-center gap-2 pt-2">
+              <Button type="submit" disabled={busy}>{busy ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : 'Save question'}</Button>
+              <Button type="button" variant="ghost" onClick={closeForm}>Cancel</Button>
+            </div>
+          </form>
+        </Card>
+      </div>
+    );
+  }
+
+  // ──────────────── LIST VIEW ────────────────
   return (
     <div className="space-y-5 lm-fade-up">
       <button onClick={() => navigate(`/admin/diagnostics/topics/${skill?.topic_id ?? ''}`)} className="flex items-center gap-1.5 text-sm font-bold text-[var(--ink-soft)] hover:text-[var(--ink)]">
@@ -175,96 +283,6 @@ export function AdminDiagnosticQuestions({ skillId }: { skillId: string }) {
           ))}
         </div>
       )}
-
-      <Modal
-        open={showForm}
-        onClose={() => setShowForm(false)}
-        title={editing ? 'Edit question' : 'Add question'}
-        footer={
-          <>
-            <Button variant="ghost" onClick={() => setShowForm(false)}>Cancel</Button>
-            <Button onClick={() => save()} disabled={busy}>{busy ? <><Loader2 size={16} className="animate-spin" /> Saving…</> : 'Save'}</Button>
-          </>
-        }
-      >
-        <form onSubmit={save} className="space-y-4">
-          <Input label="Question text" value={questionText} onChange={(e) => setQuestionText(e.target.value)} placeholder="e.g. What is 1/2 + 1/4?" autoFocus />
-
-          <label className="block">
-            <span className="lm-label block mb-1.5">Question type</span>
-            <select
-              className="lm-input"
-              value={questionType}
-              onChange={(e) => {
-                const val = e.target.value as DiagnosticQuestionType;
-                setQuestionType(val);
-                setCorrectAnswer('');
-                if (val === 'true_false') setOptions(['True', 'False']);
-                else if (val === 'mcq') setOptions(['', '']);
-              }}
-            >
-              <option value="mcq">Multiple choice</option>
-              <option value="true_false">True / False</option>
-              <option value="short_answer">Short answer</option>
-            </select>
-          </label>
-
-          {questionType === 'mcq' && (
-            <div>
-              <span className="lm-label block mb-1.5">Options</span>
-              <div className="space-y-2">
-                {options.map((o, i) => (
-                  <div key={i} className="flex items-center gap-2">
-                    <input
-                      className="lm-input flex-1"
-                      value={o}
-                      onChange={(e) => updateOption(i, e.target.value)}
-                      placeholder={`Option ${i + 1}`}
-                    />
-                    {options.length > 2 && (
-                      <button type="button" onClick={() => removeOption(i)} className="p-1.5 text-[var(--ink-soft)] hover:text-[#dc2626]"><X size={16} /></button>
-                    )}
-                  </div>
-                ))}
-              </div>
-              <button type="button" onClick={addOption} className="mt-2 text-sm font-bold text-[var(--terracotta)] hover:underline">+ Add option</button>
-            </div>
-          )}
-
-          {questionType === 'true_false' ? (
-            <label className="block">
-              <span className="lm-label block mb-1.5">Correct answer</span>
-              <select className="lm-input" value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)}>
-                <option value="">Select…</option>
-                <option value="True">True</option>
-                <option value="False">False</option>
-              </select>
-            </label>
-          ) : questionType === 'mcq' ? (
-            <label className="block">
-              <span className="lm-label block mb-1.5">Correct answer</span>
-              <select className="lm-input" value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)}>
-                <option value="">Select the correct option…</option>
-                {options.filter((o) => o.trim()).map((o, i) => <option key={i} value={o}>{o}</option>)}
-              </select>
-            </label>
-          ) : (
-            <Input label="Correct answer" value={correctAnswer} onChange={(e) => setCorrectAnswer(e.target.value)} placeholder="Expected answer" />
-          )}
-
-          <label className="block">
-            <span className="lm-label block mb-1.5">Difficulty</span>
-            <select className="lm-input" value={difficulty} onChange={(e) => setDifficulty(e.target.value as DiagnosticDifficulty)}>
-              <option value="easy">Easy</option>
-              <option value="medium">Medium</option>
-              <option value="hard">Hard</option>
-            </select>
-          </label>
-
-          {formErr && <p className="text-sm font-semibold text-[#dc2626] bg-[#fef2f2] rounded-lg px-3 py-2">{formErr}</p>}
-          <button type="submit" className="hidden" aria-hidden="true" tabIndex={-1} />
-        </form>
-      </Modal>
 
       <ConfirmDialog
         open={!!confirmDelete}
