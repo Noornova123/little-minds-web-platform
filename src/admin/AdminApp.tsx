@@ -15,6 +15,7 @@ import { AdminBanners } from '@/admin/AdminBanners';
 import { AdminChecklistStatements } from '@/admin/AdminChecklistStatements';
 import { AdminAcademicMarks } from '@/admin/AdminAcademicMarks';
 import { AdminBootstrap } from '@/admin/AdminBootstrap';
+import { AdminBoards } from '@/admin/AdminBoards';
 import { AdminDiagnostics } from '@/admin/AdminDiagnostics';
 import { AdminDiagnosticTopics } from '@/admin/AdminDiagnosticTopics';
 import { AdminDiagnosticSkills } from '@/admin/AdminDiagnosticSkills';
@@ -46,6 +47,7 @@ export function AdminApp() {
           path.startsWith('/admin/content') ? <AdminContent /> :
           path.startsWith('/admin/categories') ? <AdminCategories /> :
           path.startsWith('/admin/grades') ? <AdminGrades /> :
+          path.startsWith('/admin/boards') ? <AdminBoards /> :
           path.startsWith('/admin/teachers') ? <AdminTeachers /> :
           path.startsWith('/admin/billing') ? <AdminBilling /> :
           path.startsWith('/admin/announcements') ? <AdminAnnouncements /> :
