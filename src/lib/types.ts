@@ -275,3 +275,85 @@ export interface TeacherFeedback {
   created_at: string;
   teacher?: { name: string } | null; // populated when fetched with a join
 }
+
+// ──────────────── Diagnostic Program ────────────────
+
+export type DiagnosticQuestionType = 'mcq' | 'true_false' | 'short_answer';
+export type DiagnosticDifficulty = 'easy' | 'medium' | 'hard';
+export type DiagnosticMasteryLevel = 'needs_support' | 'developing' | 'strong';
+export type DiagnosticAttemptStatus = 'in_progress' | 'completed';
+export type DiagnosticRoadmapStatus = 'pending' | 'in_progress' | 'done';
+
+export interface DiagnosticSubject {
+  id: string;
+  name: string;
+  display_order: number;
+  created_at: string;
+}
+
+export interface DiagnosticTopic {
+  id: string;
+  subject_id: string;
+  grade_level: string;
+  name: string;
+  display_order: number;
+  created_at: string;
+}
+
+export interface DiagnosticSkill {
+  id: string;
+  topic_id: string;
+  name: string;
+  display_order: number;
+  created_at: string;
+}
+
+export interface DiagnosticQuestion {
+  id: string;
+  skill_id: string;
+  question_text: string;
+  question_type: DiagnosticQuestionType;
+  options: string[];
+  correct_answer: string;
+  difficulty: DiagnosticDifficulty;
+  created_at: string;
+}
+
+export interface DiagnosticAttempt {
+  id: string;
+  student_id: string;
+  subject_id: string;
+  grade_level: string;
+  status: DiagnosticAttemptStatus;
+  started_at: string;
+  completed_at: string | null;
+}
+
+export interface DiagnosticResponseRow {
+  id: string;
+  attempt_id: string;
+  question_id: string;
+  skill_id: string;
+  student_answer: string | null;
+  is_correct: boolean;
+  answered_at: string;
+}
+
+export interface DiagnosticSkillMastery {
+  id: string;
+  student_id: string;
+  skill_id: string;
+  mastery_level: DiagnosticMasteryLevel;
+  score_percent: number;
+  last_updated: string;
+}
+
+export interface DiagnosticRoadmapItem {
+  id: string;
+  student_id: string;
+  skill_id: string;
+  priority: number;
+  status: DiagnosticRoadmapStatus;
+  recommended_activity: string | null;
+  created_at: string;
+}
