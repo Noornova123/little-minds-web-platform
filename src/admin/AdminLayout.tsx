@@ -1,5 +1,5 @@
 import { type ReactNode, useState } from 'react';
-import { LayoutDashboard, Building2, BookOpen, Tags, GraduationCap, Users, CreditCard, Megaphone, LifeBuoy, ImagePlus, ListChecks, ClipboardList, Stethoscope, LogOut, Menu, X } from 'lucide-react';
+import { LayoutDashboard, Building2, BookOpen, Tags, GraduationCap, Landmark, Users, CreditCard, Megaphone, LifeBuoy, ImagePlus, ListChecks, ClipboardList, Stethoscope, LogOut, Menu, X } from 'lucide-react';
 import { useAuth } from '@/lib/auth';
 import { useHashRoute, navigate, matchPath } from '@/lib/router';
 
@@ -9,6 +9,7 @@ const navItems = [
   { label: 'Content', path: '/admin/content', icon: BookOpen },
   { label: 'Categories', path: '/admin/categories', icon: Tags },
   { label: 'Grade Levels', path: '/admin/grades', icon: GraduationCap },
+  { label: 'Boards', path: '/admin/boards', icon: Landmark },
   { label: 'Teachers', path: '/admin/teachers', icon: Users },
   { label: 'Billing', path: '/admin/billing', icon: CreditCard },
   { label: 'Announcements', path: '/admin/announcements', icon: Megaphone },
@@ -30,6 +31,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
   const onSchoolDetail = !!matchPath('/admin/schools/:id', path);
   const onCategories = path.startsWith('/admin/categories');
   const onGrades = path.startsWith('/admin/grades');
+  const onBoards = path.startsWith('/admin/boards');
   const onTeachers = path.startsWith('/admin/teachers');
   const onBilling = path.startsWith('/admin/billing');
   const onAnnouncements = path.startsWith('/admin/announcements');
@@ -93,7 +95,7 @@ export function AdminLayout({ children }: { children: ReactNode }) {
           </button>
           <div className="flex-1">
             <h2 className="font-extrabold text-[var(--ink)] text-lg leading-tight" style={{ fontFamily: 'Fraunces, serif' }}>
-              {onSchoolDetail ? 'School Detail' : onCategories ? 'Categories' : onGrades ? 'Grade Levels' : onTeachers ? 'Teachers' : onBilling ? 'Billing' : onAnnouncements ? 'Announcements' : onBanners ? 'Banners' : onChecklist ? 'Checklist Statements' : onAcademicMarks ? 'Academic Marks' : onDiagnostics ? 'Diagnostics' : onHelp ? 'Help Content' : navItems.find((i) => isActive(i))?.label ?? 'Admin'}
+              {onSchoolDetail ? 'School Detail' : onCategories ? 'Categories' : onGrades ? 'Grade Levels' : onBoards ? 'Boards' : onTeachers ? 'Teachers' : onBilling ? 'Billing' : onAnnouncements ? 'Announcements' : onBanners ? 'Banners' : onChecklist ? 'Checklist Statements' : onAcademicMarks ? 'Academic Marks' : onDiagnostics ? 'Diagnostics' : onHelp ? 'Help Content' : navItems.find((i) => isActive(i))?.label ?? 'Admin'}
             </h2>
           </div>
         </header>
