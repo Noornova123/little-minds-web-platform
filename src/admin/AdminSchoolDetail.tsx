@@ -13,6 +13,7 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
   const [teachers, setTeachers] = useState<Teacher[]>([]);
   const [classes, setClasses] = useState<ClassRow[]>([]);
   const [studentsByClass, setStudentsByClass] = useState<Record<string, Student[]>>({});
+  const [teachersByClass, setTeachersByClass] = useState<Record<string, Teacher[]>>({});
   const [loading, setLoading] = useState(true);
 
   // modals
@@ -20,6 +21,7 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
   const [showClass, setShowClass] = useState(false);
   const [showUpload, setShowUpload] = useState<string | null>(null); // class id
   const [showAddStudent, setShowAddStudent] = useState<string | null>(null); // class id
+  const [showAssignTeacher, setShowAssignTeacher] = useState<string | null>(null); // class id
   const [confirmDelete, setConfirmDelete] = useState<{ kind: 'teacher' | 'class' | 'student'; id: string; name: string } | null>(null);
 
   // add single student form
@@ -43,6 +45,11 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
   const [cBusy, setCBusy] = useState(false);
   const [cErr, setCErr] = useState<string | null>(null);
   const [gradeLevels, setGradeLevels] = useState<GradeLevel[]>([]);
+
+  // assign teacher (to an existing class, any time)
+  const [assignTeacherId, setAssignTeacherId] = useState('');
+  const [assignBusy, setAssignBusy] = useState(false);
+  const [assignErr, setAssignErr] = useState<string | null>(null);
 
   // upload
   const [uploadText, setUploadText] = useState('name,roll_number\nAarav Sharma,01\nDiya Patel,02');
@@ -70,16 +77,33 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
     ]);
     setGradeLevels((gls as GradeLevel[]) ?? []);
     setSchool(s as School | null);
-    setTeachers((t as Teacher[]) ?? []);
+    const teacherRows = (t as Teacher[]) ?? [];
+    setTeachers(teacherRows);
     const classRows = (c as ClassRow[]) ?? [];
     setClasses(classRows);
 
-    const map: Record<string, Student[]> = {};
-    await Promise.all(classRows.map(async (cl) => {
-      const { data: st } = await supabase.from('students').select('*').eq('class_id', cl.id).order('roll_number');
-      map[cl.id] = (st as Student[]) ?? [];
-    }));
-    setStudentsByClass(map);
+    const studentMap: Record<string, Student[]> = {};
+    const teacherMap: Record<string, Teacher[]> = {};
+    for (const cl of classRows) teacherMap[cl.id] = [];
+
+    if (classRows.length > 0) {
+      const classIds = classRows.map((cl) => cl.id);
+      const [studentRes, classTeacherRes] = await Promise.all([
+        supabase.from('students').select('*').in('class_id', classIds).order('roll_number'),
+        supabase.from('class_teachers').select('class_id, teacher_id').in('class_id', classIds),
+      ]);
+      const studentsAll = (studentRes.data as Student[]) ?? [];
+      for (const cl of classRows) studentMap[cl.id] = studentsAll.filter((st) => st.class_id === cl.id);
+
+      const teacherById: Record<string, Teacher> = {};
+      teacherRows.forEach((tt) => { teacherById[tt.id] = tt; });
+      (classTeacherRes.data ?? []).forEach((row: any) => {
+        const teacherObj = teacherById[row.teacher_id];
+        if (teacherObj) teacherMap[row.class_id] = [...(teacherMap[row.class_id] ?? []), teacherObj];
+      });
+    }
+    setStudentsByClass(studentMap);
+    setTeachersByClass(teacherMap);
     setLoading(false);
   }
 
@@ -112,12 +136,29 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
     e.preventDefault();
     setCBusy(true); setCErr(null);
     const payload: Record<string, unknown> = { school_id: schoolId, name: cName };
-    if (cTeacher) payload.teacher_id = cTeacher;
     if (cGrade) payload.grade_level = cGrade;
-    const { error } = await supabase.from('classes').insert(payload);
+    const { data: newClass, error } = await supabase.from('classes').insert(payload).select().maybeSingle();
+    if (error) { setCBusy(false); setCErr(error.message); return; }
+    if (cTeacher && newClass) {
+      await supabase.from('class_teachers').insert({ class_id: newClass.id, teacher_id: cTeacher });
+    }
     setCBusy(false);
-    if (error) { setCErr(error.message); return; }
     setShowClass(false); setCName(''); setCTeacher(''); setCGrade('');
+    load();
+  }
+
+  async function assignTeacher() {
+    if (!showAssignTeacher || !assignTeacherId) return;
+    setAssignBusy(true); setAssignErr(null);
+    const { error } = await supabase.from('class_teachers').insert({ class_id: showAssignTeacher, teacher_id: assignTeacherId });
+    setAssignBusy(false);
+    if (error) { setAssignErr(error.message); return; }
+    setShowAssignTeacher(null); setAssignTeacherId('');
+    load();
+  }
+
+  async function unassignTeacher(classId: string, teacherId: string) {
+    await supabase.from('class_teachers').delete().eq('class_id', classId).eq('teacher_id', teacherId);
     load();
   }
 
@@ -267,13 +308,14 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
           <div className="space-y-3">
             {classes.map((c) => {
               const sts = studentsByClass[c.id] ?? [];
-              const teacher = teachers.find((t) => t.id === c.teacher_id);
+              const clsTeachers = teachersByClass[c.id] ?? [];
+              const availableTeachers = teachers.filter((t) => !clsTeachers.some((ct) => ct.id === t.id));
               return (
                 <div key={c.id} className="rounded-xl border border-[var(--line)] p-4">
                   <div className="flex items-center justify-between flex-wrap gap-2">
                     <div className="min-w-0 flex-1">
                       <p className="font-bold text-[var(--ink)]">{c.name}</p>
-                      <p className="text-xs text-[var(--ink-soft)]">{teacher ? teacher.name : 'Unassigned'} · {sts.length} students{c.grade_level ? ` · ${c.grade_level}` : ''}</p>
+                      <p className="text-xs text-[var(--ink-soft)]">{sts.length} students{c.grade_level ? ` · ${c.grade_level}` : ''}</p>
                     </div>
                     <div className="flex items-center gap-2 shrink-0">
                       <Button size="sm" variant="ghost" onClick={() => { setShowAddStudent(c.id); setSErr(null); setSName(''); setSRoll(''); }}><Plus size={14} /> <span className="hidden sm:inline">Add student</span><span className="sm:hidden">Add</span></Button>
@@ -283,6 +325,34 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
                       </button>
                     </div>
                   </div>
+
+                  {/* Teachers assigned to this class — editable any time, multiple allowed */}
+                  <div className="mt-3">
+                    <p className="text-[10px] font-extrabold uppercase tracking-wider text-[var(--ink-soft)] mb-1.5">Teachers</p>
+                    <div className="flex flex-wrap gap-1.5 items-center">
+                      {clsTeachers.length === 0 && <span className="text-xs text-[var(--ink-soft)] mr-1">Unassigned</span>}
+                      {clsTeachers.map((t) => (
+                        <span key={t.id} className="lm-chip bg-[var(--cream-deep)] text-[var(--ink-soft)] group">
+                          <UserCog size={11} className="inline mr-1 -mt-0.5" />{t.name}
+                          <button
+                            onClick={() => unassignTeacher(c.id, t.id)}
+                            className="ml-1 -mr-0.5 text-[var(--ink-soft)]/60 hover:text-[#dc2626]"
+                            aria-label={`Unassign ${t.name}`}
+                          >
+                            ×
+                          </button>
+                        </span>
+                      ))}
+                      <button
+                        onClick={() => { setShowAssignTeacher(c.id); setAssignTeacherId(availableTeachers[0]?.id ?? ''); setAssignErr(null); }}
+                        disabled={availableTeachers.length === 0}
+                        className="text-xs font-bold text-[var(--terracotta)] hover:underline px-1 disabled:opacity-40 disabled:cursor-not-allowed"
+                      >
+                        + Assign teacher
+                      </button>
+                    </div>
+                  </div>
+
                   {sts.length > 0 && (
                     <div className="mt-3 flex flex-wrap gap-1.5">
                       {sts.map((s) => (
@@ -342,11 +412,12 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
         <form onSubmit={createClass} className="space-y-4">
           <Input label="Class name" value={cName} onChange={(e) => setCName(e.target.value)} placeholder="e.g. Grade 3 - Stars" required />
           <label className="block">
-            <span className="lm-label block mb-1.5">Assign teacher (optional)</span>
+            <span className="lm-label block mb-1.5">Assign a teacher (optional)</span>
             <select className="lm-input" value={cTeacher} onChange={(e) => setCTeacher(e.target.value)}>
               <option value="">Unassigned</option>
               {teachers.map((t) => <option key={t.id} value={t.id}>{t.name}</option>)}
             </select>
+            <span className="text-xs text-[var(--ink-soft)] block mt-1">You can add more teachers, or change this, at any time after the class is created.</span>
           </label>
           <label className="block">
             <span className="lm-label block mb-1.5">Grade level</span>
@@ -357,6 +428,35 @@ export function AdminSchoolDetail({ schoolId }: { schoolId: string }) {
           </label>
           {cErr && <p className="text-sm font-semibold text-[#dc2626] bg-[#fef2f2] rounded-lg px-3 py-2">{cErr}</p>}
         </form>
+      </Modal>
+
+      {/* Assign teacher modal (existing class, any time) */}
+      <Modal
+        open={!!showAssignTeacher}
+        onClose={() => setShowAssignTeacher(null)}
+        title="Assign teacher"
+        footer={
+          <>
+            <Button variant="ghost" onClick={() => setShowAssignTeacher(null)}>Cancel</Button>
+            <Button onClick={assignTeacher} disabled={assignBusy || !assignTeacherId}>{assignBusy ? 'Assigning…' : 'Assign'}</Button>
+          </>
+        }
+      >
+        <div className="space-y-4">
+          {teachers.filter((t) => !(teachersByClass[showAssignTeacher ?? '']?.some((ct) => ct.id === t.id))).length === 0 ? (
+            <p className="text-sm text-[var(--ink-soft)]">Every teacher at this school is already assigned to this class. Add another teacher to the school first if you need a different one.</p>
+          ) : (
+            <label className="block">
+              <span className="lm-label block mb-1.5">Teacher</span>
+              <select className="lm-input" value={assignTeacherId} onChange={(e) => setAssignTeacherId(e.target.value)}>
+                {teachers.filter((t) => !(teachersByClass[showAssignTeacher ?? '']?.some((ct) => ct.id === t.id))).map((t) => (
+                  <option key={t.id} value={t.id}>{t.name}</option>
+                ))}
+              </select>
+            </label>
+          )}
+          {assignErr && <p className="text-sm font-semibold text-[#dc2626] bg-[#fef2f2] rounded-lg px-3 py-2">{assignErr}</p>}
+        </div>
       </Modal>
 
       {/* Add single student modal */}
